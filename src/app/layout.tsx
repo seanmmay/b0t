@@ -39,12 +39,12 @@ export default function RootLayout({
       >
         <AppLoader />
         <NextTopLoader
-          color="#0070f3"
+          color="#ff6b35"
           height={2}
           showSpinner={false}
           easing="ease"
           speed={200}
-          shadow="0 0 10px #0070f3,0 0 5px #0070f3"
+          shadow="0 0 10px #ff6b35,0 0 5px #ff6b35"
         />
         <SessionProvider>{children}</SessionProvider>
         <Toaster />

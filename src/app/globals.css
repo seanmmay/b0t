@@ -3,20 +3,20 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Vercel-style: Pure black with high contrast white text */
-  --background: #000000;
-  --foreground: #fafafa;
+  /* Cozy Cat: Warm dark purple with playful orange accent */
+  --background: #1a1625;
+  --foreground: #f5f3ff;
 
   /* Surface colors */
-  --surface: #0a0a0a;
-  --surface-hover: #141414;
+  --surface: #241d30;
+  --surface-hover: #2d2438;
 
   /* Text colors */
-  --text-primary: #fafafa;
-  --text-muted: #a1a1a1;
+  --text-primary: #f5f3ff;
+  --text-muted: #a599c8;
 
-  /* Accent */
-  --accent: #0070f3;
+  /* Accent - Warm coral/orange (cat energy!) */
+  --accent: #ff6b35;
 
   /* Platform brand colors */
   --twitter-blue: #1DA1F2;
@@ -26,8 +26,8 @@
   --success-green: #10b981;
 
   /* Borders */
-  --border: #262626;
-  --border-hover: #404040;
+  --border: #3a2f4a;
+  --border-hover: #4d4060;
 
   /* Radius */
   --radius: 0.5rem;
@@ -35,17 +35,17 @@
   /* shadcn color mappings */
   --card: var(--surface);
   --card-foreground: var(--text-primary);
-  --popover: #111111;
+  --popover: #2a2135;
   --popover-foreground: var(--text-primary);
   --primary: var(--accent);
   --primary-foreground: #ffffff;
   --secondary: var(--text-muted);
   --secondary-foreground: var(--text-primary);
-  --muted: #141414;
+  --muted: #2d2438;
   --muted-foreground: var(--text-muted);
   --destructive: #ff4444;
   --destructive-foreground: #ffffff;
-  --input: #0a0a0a;
+  --input: #241d30;
   --ring: var(--accent);
 }
 

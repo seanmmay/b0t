@@ -30,7 +30,7 @@ export function fireSuccessConfetti() {
     particleCount: 80,
     spread: 70,
     origin: { x: 0.85, y: 0.85 },
-    colors: ['#10b981', '#34d399', '#6ee7b7'],
+    colors: ['#ff6b35', '#ff8c5a', '#ffad7f'],
     shapes: ['circle'],
     scalar: 1.2,
   });
