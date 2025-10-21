@@ -3,19 +3,20 @@ import { generateTweet } from '../openai';
 import { postTweet } from '../twitter';
 import { db, useSQLite } from '../db';
 import { tweetsTableSQLite, tweetsTablePostgres } from '../schema';
+import { logger } from '../logger';
 
 /**
  * Generate and optionally post an AI-generated tweet
  */
 export async function generateAndPostTweet() {
-  console.log('🤖 Starting AI tweet generation job...');
+  logger.info('Starting AI tweet generation job');
 
   try {
     // Generate tweet content using OpenAI
     const prompt = 'Write an engaging tweet about technology and AI';
     const tweetContent = await generateTweet(prompt);
 
-    console.log(`📝 Generated tweet: ${tweetContent}`);
+    logger.info({ contentLength: tweetContent.length, preview: tweetContent.substring(0, 50) }, 'Generated tweet');
 
     // Save to database
     if (useSQLite) {
@@ -34,14 +35,14 @@ export async function generateAndPostTweet() {
         });
     }
 
-    console.log('💾 Saved tweet to database as draft');
+    logger.info('Saved tweet to database as draft');
 
     // Uncomment the following lines to actually post to Twitter
     // WARNING: This will post to your Twitter account!
     /*
     if (twitterClient) {
       const result = await postTweet(tweetContent);
-      console.log(`✅ Posted tweet with ID: ${result.id}`);
+      logger.info({ tweetId: result.id }, 'Posted tweet');
 
       // Update database with posted status
       await db.update(tweetsTable)
@@ -54,9 +55,9 @@ export async function generateAndPostTweet() {
     }
     */
 
-    console.log('✅ AI tweet generation job completed');
+    logger.info('AI tweet generation job completed');
   } catch (error) {
-    console.error('❌ Error in AI tweet generation job:', error);
+    logger.error({ error }, 'Error in AI tweet generation job');
     throw error;
   }
 }
@@ -65,12 +66,12 @@ export async function generateAndPostTweet() {
  * Fetch and analyze recent tweets
  */
 export async function analyzeTrends() {
-  console.log('📊 Starting trend analysis job...');
+  logger.info('Starting trend analysis job');
 
   try {
     // This is a placeholder - implement your actual logic
-    console.log('   Analyzing Twitter trends...');
-    console.log('   This would fetch trending topics and analyze them');
+    logger.info('Analyzing Twitter trends');
+    logger.info('This would fetch trending topics and analyze them');
 
     // Example: You could:
     // 1. Search for trending hashtags
@@ -78,9 +79,9 @@ export async function analyzeTrends() {
     // 3. Generate insights with OpenAI
     // 4. Store results in database
 
-    console.log('✅ Trend analysis job completed');
+    logger.info('Trend analysis job completed');
   } catch (error) {
-    console.error('❌ Error in trend analysis job:', error);
+    logger.error({ error }, 'Error in trend analysis job');
     throw error;
   }
 }
@@ -89,7 +90,7 @@ export async function analyzeTrends() {
  * Scheduled content generation without posting
  */
 export async function generateScheduledContent() {
-  console.log('✍️  Generating scheduled content...');
+  logger.info('Generating scheduled content');
 
   try {
     const prompts = [
@@ -102,7 +103,7 @@ export async function generateScheduledContent() {
     const randomPrompt = prompts[Math.floor(Math.random() * prompts.length)];
     const content = await generateTweet(randomPrompt);
 
-    console.log(`📝 Generated content: ${content}`);
+    logger.info({ contentLength: content.length, preview: content.substring(0, 50) }, 'Generated content');
 
     // Save to database
     if (useSQLite) {
@@ -121,10 +122,10 @@ export async function generateScheduledContent() {
         });
     }
 
-    console.log('💾 Content saved to database for later review');
-    console.log('✅ Content generation job completed');
+    logger.info('Content saved to database for later review');
+    logger.info('Content generation job completed');
   } catch (error) {
-    console.error('❌ Error in content generation job:', error);
+    logger.error({ error }, 'Error in content generation job');
     throw error;
   }
 }

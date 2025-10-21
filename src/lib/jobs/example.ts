@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import { logger, logJobStart, logJobComplete } from '../logger';
 
 /**
@@ -18,7 +17,10 @@ export async function exampleEvery5Minutes() {
   // - Update database
   // - Send notifications
 
-  const timestamp = format(new Date(), 'PPpp');
+  const timestamp = new Date().toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'medium'
+  });
   logger.info({ timestamp }, 'Example 5-minute job executed');
 
   logJobComplete('example-every-5-minutes');

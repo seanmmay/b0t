@@ -3,6 +3,8 @@ import { exampleEvery5Minutes, exampleHourly, exampleDaily } from './example';
 import { generateAndPostTweet, analyzeTrends, generateScheduledContent } from './twitter-ai';
 import { replyToTweetsJob } from './twitter-reply';
 import { checkAndReplyToYouTubeComments, trackYouTubeVideo, fetchYouTubeCommentsForAnalysis } from './youtube';
+import { initializeBullMQJobs, isBullMQAvailable } from './bullmq-jobs';
+import { logger } from '../logger';
 
 /**
  * Define all your scheduled jobs here
@@ -82,19 +84,37 @@ const jobs: ScheduledJob[] = [
 
 /**
  * Initialize and start all scheduled jobs
+ *
+ * Uses BullMQ (with Redis) if REDIS_URL is set, otherwise falls back to node-cron.
+ * BullMQ provides job persistence across Railway restarts.
  */
-export function initializeScheduler() {
-  console.log('🔧 Initializing scheduler...');
+export async function initializeScheduler() {
+  logger.info('Initializing job scheduler');
 
-  // Register all jobs
+  // Try BullMQ first (requires Redis)
+  if (isBullMQAvailable()) {
+    logger.info('Redis detected - attempting to initialize BullMQ for persistent jobs');
+    const bullMQInitialized = await initializeBullMQJobs();
+
+    if (bullMQInitialized) {
+      logger.info('BullMQ initialized successfully - jobs will persist across restarts');
+      return;
+    }
+
+    logger.warn('BullMQ initialization failed - falling back to node-cron');
+  } else {
+    logger.info('No Redis configured - using node-cron for job scheduling');
+    logger.info('To enable persistent jobs: Add Redis in Railway (1 click) and set REDIS_URL');
+  }
+
+  // Fallback to node-cron
   jobs.forEach((job) => {
     scheduler.register(job);
   });
 
-  // Start the scheduler
   scheduler.start();
 
-  console.log('📋 Available jobs:', scheduler.getJobs());
+  logger.info({ jobCount: scheduler.getJobs().length }, 'Node-cron scheduler started');
 }
 
 /**

@@ -1,11 +1,19 @@
 import { google, youtube_v3 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library';
+import { logger } from './logger';
+import { createCircuitBreaker } from './resilience';
+import { createRateLimiter } from './rate-limiter';
 
 /**
  * YouTube Data API v3 Client
  *
  * This module provides functions to interact with YouTube API
  * for commenting, replying, and managing video content.
+ *
+ * Features:
+ * - Circuit breaker for API failures
+ * - Rate limiting (10,000 quota units/day)
+ * - Automatic retries and error handling
  */
 
 // Check if YouTube credentials are set
@@ -15,7 +23,7 @@ const hasYouTubeCredentials =
   process.env.YOUTUBE_REFRESH_TOKEN;
 
 if (!hasYouTubeCredentials) {
-  console.warn('⚠️  YouTube API credentials are not fully set. YouTube features will not work.');
+  logger.warn('YouTube API credentials are not fully set. YouTube features will not work.');
 }
 
 // Initialize OAuth2 client
@@ -41,30 +49,63 @@ if (hasYouTubeCredentials) {
   });
 }
 
+// YouTube API Rate Limiter: 10,000 quota units per day
+// Conservative: ~400 requests/day = ~16 requests/hour = 1 request/225 seconds
+const youtubeRateLimiter = createRateLimiter({
+  maxConcurrent: 1,
+  minTime: 3600, // 3.6 seconds between calls = ~1000 calls/hour (very conservative for quota)
+  reservoir: 400,
+  reservoirRefreshAmount: 400,
+  reservoirRefreshInterval: 24 * 60 * 60 * 1000, // 24 hours
+  id: 'youtube-api',
+});
+
 export { oauth2Client, youtubeClient };
 
 /**
- * Get comments for a video
+ * Wrapper for YouTube API calls with circuit breaker and rate limiting
  */
-export async function getVideoComments(videoId: string, maxResults = 100) {
+function withYouTubeProtection<T extends (...args: never[]) => Promise<unknown>>(
+  fn: T,
+  name: string
+): (...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>> {
+  const breaker = createCircuitBreaker(
+    async (...args: Parameters<T>) => {
+      return await youtubeRateLimiter.schedule(() => fn(...args));
+    },
+    {
+      timeout: 10000, // 10 seconds
+      errorThresholdPercentage: 50,
+      resetTimeout: 120000, // 2 minutes
+      name: `youtube-${name}`,
+    }
+  );
+
+  return breaker.fire as (...args: Parameters<T>) => Promise<Awaited<ReturnType<T>>>;
+}
+
+/**
+ * Get comments for a video (Internal)
+ */
+async function _getVideoComments(videoId: string, maxResults = 100) {
   if (!youtubeClient) {
     throw new Error('YouTube client is not initialized. Please set YouTube API credentials.');
   }
 
-  try {
-    const response = await youtubeClient.commentThreads.list({
-      part: ['snippet', 'replies'],
-      videoId,
-      maxResults,
-      order: 'time', // Most recent first
-    });
+  const response = await youtubeClient.commentThreads.list({
+    part: ['snippet', 'replies'],
+    videoId,
+    maxResults,
+    order: 'time', // Most recent first
+  });
 
-    return response.data.items || [];
-  } catch (error) {
-    console.error('Error fetching video comments:', error);
-    throw error;
-  }
+  return response.data.items || [];
 }
+
+/**
+ * Get comments for a video (Protected)
+ */
+export const getVideoComments = withYouTubeProtection(_getVideoComments, 'get-comments');
 
 /**
  * Reply to a comment
@@ -87,7 +128,7 @@ export async function replyToComment(commentId: string, text: string) {
 
     return response.data;
   } catch (error) {
-    console.error('Error replying to comment:', error);
+    logger.error({ error, commentId, textLength: text.length }, 'Error replying to comment');
     throw error;
   }
 }
@@ -118,7 +159,7 @@ export async function postComment(videoId: string, text: string, channelId: stri
 
     return response.data;
   } catch (error) {
-    console.error('Error posting comment:', error);
+    logger.error({ error, videoId, channelId, textLength: text.length }, 'Error posting comment');
     throw error;
   }
 }
@@ -138,7 +179,7 @@ export async function deleteComment(commentId: string) {
 
     return { success: true };
   } catch (error) {
-    console.error('Error deleting comment:', error);
+    logger.error({ error, commentId }, 'Error deleting comment');
     throw error;
   }
 }
@@ -159,7 +200,7 @@ export async function getVideoDetails(videoId: string) {
 
     return response.data.items?.[0] || null;
   } catch (error) {
-    console.error('Error fetching video details:', error);
+    logger.error({ error, videoId }, 'Error fetching video details');
     throw error;
   }
 }
@@ -183,7 +224,7 @@ export async function searchVideos(query: string, maxResults = 10) {
 
     return response.data.items || [];
   } catch (error) {
-    console.error('Error searching videos:', error);
+    logger.error({ error, query, maxResults }, 'Error searching videos');
     throw error;
   }
 }
@@ -206,7 +247,7 @@ export async function getChannelDetails(channelId?: string) {
 
     return response.data.items?.[0] || null;
   } catch (error) {
-    console.error('Error fetching channel details:', error);
+    logger.error({ error, channelId }, 'Error fetching channel details');
     throw error;
   }
 }
@@ -226,7 +267,7 @@ export async function markCommentAsSpam(commentId: string) {
 
     return { success: true };
   } catch (error) {
-    console.error('Error marking comment as spam:', error);
+    logger.error({ error, commentId }, 'Error marking comment as spam');
     throw error;
   }
 }
@@ -250,7 +291,7 @@ export async function setCommentModerationStatus(
 
     return { success: true };
   } catch (error) {
-    console.error('Error setting comment moderation status:', error);
+    logger.error({ error, commentId, status }, 'Error setting comment moderation status');
     throw error;
   }
 }
@@ -271,7 +312,7 @@ export async function getComment(commentId: string) {
 
     return response.data.items?.[0] || null;
   } catch (error) {
-    console.error('Error fetching comment:', error);
+    logger.error({ error, commentId }, 'Error fetching comment');
     throw error;
   }
 }

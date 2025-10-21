@@ -4,6 +4,7 @@ import { useSQLite, sqliteDb, postgresDb } from '@/lib/db';
 import { oauthStateTableSQLite, oauthStateTablePostgres, accountsTableSQLite, accountsTablePostgres } from '@/lib/schema';
 import { logger } from '@/lib/logger';
 import { eq, and } from 'drizzle-orm';
+import { encrypt } from '@/lib/crypto';
 
 /**
  * Twitter OAuth 2.0 Callback Handler
@@ -131,8 +132,12 @@ export async function GET(request: NextRequest) {
       'Twitter OAuth login successful'
     );
 
-    // Store tokens in accounts table
+    // Store tokens in accounts table (encrypted for security)
     const expiresAt = expiresIn ? Math.floor(Date.now() / 1000) + expiresIn : null;
+
+    // Encrypt tokens before storing
+    const encryptedAccessToken = await encrypt(accessToken);
+    const encryptedRefreshToken = refreshToken ? await encrypt(refreshToken) : null;
 
     if (useSQLite) {
       if (!sqliteDb) throw new Error('SQLite database not initialized');
@@ -154,8 +159,8 @@ export async function GET(request: NextRequest) {
         await sqliteDb
           .update(accountsTableSQLite)
           .set({
-            access_token: accessToken,
-            refresh_token: refreshToken || existingAccount.refresh_token,
+            access_token: encryptedAccessToken,
+            refresh_token: encryptedRefreshToken || existingAccount.refresh_token,
             expires_at: expiresAt,
             providerAccountId: twitterUser.id,
           })
@@ -168,8 +173,8 @@ export async function GET(request: NextRequest) {
           type: 'oauth',
           provider: 'twitter',
           providerAccountId: twitterUser.id,
-          access_token: accessToken,
-          refresh_token: refreshToken,
+          access_token: encryptedAccessToken,
+          refresh_token: encryptedRefreshToken,
           expires_at: expiresAt,
           token_type: 'bearer',
           scope: 'tweet.read tweet.write users.read offline.access',
@@ -198,8 +203,8 @@ export async function GET(request: NextRequest) {
         await postgresDb
           .update(accountsTablePostgres)
           .set({
-            access_token: accessToken,
-            refresh_token: refreshToken || existingAccount.refresh_token,
+            access_token: encryptedAccessToken,
+            refresh_token: encryptedRefreshToken || existingAccount.refresh_token,
             expires_at: expiresAt,
             providerAccountId: twitterUser.id,
           })
@@ -212,8 +217,8 @@ export async function GET(request: NextRequest) {
           type: 'oauth',
           provider: 'twitter',
           providerAccountId: twitterUser.id,
-          access_token: accessToken,
-          refresh_token: refreshToken,
+          access_token: encryptedAccessToken,
+          refresh_token: encryptedRefreshToken,
           expires_at: expiresAt,
           token_type: 'bearer',
           scope: 'tweet.read tweet.write users.read offline.access',

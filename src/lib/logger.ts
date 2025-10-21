@@ -10,8 +10,7 @@ import fs from 'fs';
  * - logs/error.log (errors only)
  * - Console (development)
  *
- * Note: File rotation will be handled externally (e.g., logrotate, Docker, or cloud logging)
- * For production with rotation, consider using pino-roll in a standalone process or external log management.
+ * Note: File rotation can be handled externally (e.g., logrotate, Docker, or Railway's built-in log retention)
  *
  * Usage:
  * logger.info('Tweet generated', { tweetId: '123', content: 'Hello world' });

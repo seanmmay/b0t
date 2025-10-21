@@ -38,7 +38,7 @@ export class Pipeline<T = unknown> {
    * Stops on first error unless continueOnError is true
    */
   async execute(
-    initialContext: T,
+    initialContext: Partial<T>,
     options?: {
       continueOnError?: boolean;
       logResults?: boolean;
@@ -49,7 +49,7 @@ export class Pipeline<T = unknown> {
     finalData?: unknown;
   }> {
     const results: StepResult[] = [];
-    let context = initialContext;
+    let context = initialContext as T;
 
     logger.info({ pipeline: 'start', steps: this.steps.length }, 'Starting pipeline');
 

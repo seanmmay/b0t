@@ -5,13 +5,14 @@ import { replyToComment } from '../youtube';
 import { generateTweet } from '../openai';
 import { db, useSQLite } from '../db';
 import { youtubeVideosTableSQLite, youtubeCommentsTableSQLite, youtubeVideosTablePostgres, youtubeCommentsTablePostgres } from '../schema';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
+import { logger } from '../logger';
 
 /**
  * Check for new comments on tracked videos and reply with AI
  */
 export async function checkAndReplyToYouTubeComments() {
-  console.log('🎬 Starting YouTube comment checking job...');
+  logger.info('Starting YouTube comment checking job');
 
   try {
     // Get all tracked videos from database
@@ -20,18 +21,47 @@ export async function checkAndReplyToYouTubeComments() {
       : await (db as ReturnType<typeof import('drizzle-orm/node-postgres').drizzle>).select().from(youtubeVideosTablePostgres);
 
     if (videos.length === 0) {
-      console.log('   No videos being tracked yet');
+      logger.info('No videos being tracked yet');
       return;
     }
 
-    console.log(`   Checking ${videos.length} video(s) for new comments...`);
+    logger.info({ videoCount: videos.length }, 'Checking videos for new comments');
 
     for (const video of videos) {
-      console.log(`   📹 Checking video: ${video.title} (${video.videoId})`);
+      logger.info({ videoId: video.videoId, title: video.title }, 'Checking video for comments');
 
       // Get comments from YouTube
       const commentThreads = await getVideoComments(video.videoId, 50);
 
+      // Extract all comment IDs for batch query
+      const allCommentIds: string[] = [];
+      const commentMap = new Map<string, typeof commentThreads[0]>();
+
+      for (const thread of commentThreads) {
+        const commentId = thread.snippet?.topLevelComment?.id;
+        if (commentId) {
+          allCommentIds.push(commentId);
+          commentMap.set(commentId, thread);
+        }
+      }
+
+      // Batch query to check existing comments (fixes N+1 query issue)
+      const existingComments = allCommentIds.length > 0
+        ? useSQLite
+          ? await (db as ReturnType<typeof import('drizzle-orm/better-sqlite3').drizzle>)
+              .select({ commentId: youtubeCommentsTableSQLite.commentId })
+              .from(youtubeCommentsTableSQLite)
+              .where(inArray(youtubeCommentsTableSQLite.commentId, allCommentIds))
+          : await (db as ReturnType<typeof import('drizzle-orm/node-postgres').drizzle>)
+              .select({ commentId: youtubeCommentsTablePostgres.commentId })
+              .from(youtubeCommentsTablePostgres)
+              .where(inArray(youtubeCommentsTablePostgres.commentId, allCommentIds))
+        : [];
+
+      // Create a Set for O(1) lookup
+      const existingCommentIds = new Set(existingComments.map(c => c.commentId));
+
+      // Process only new comments
       for (const thread of commentThreads) {
         const comment = thread.snippet?.topLevelComment?.snippet;
         if (!comment) continue;
@@ -40,22 +70,16 @@ export async function checkAndReplyToYouTubeComments() {
         if (!commentId) continue;
 
         // Check if we've already seen this comment
-        const existingComment = useSQLite
-          ? await (db as ReturnType<typeof import('drizzle-orm/better-sqlite3').drizzle>)
-              .select()
-              .from(youtubeCommentsTableSQLite)
-              .where(eq(youtubeCommentsTableSQLite.commentId, commentId))
-          : await (db as ReturnType<typeof import('drizzle-orm/node-postgres').drizzle>)
-              .select()
-              .from(youtubeCommentsTablePostgres)
-              .where(eq(youtubeCommentsTablePostgres.commentId, commentId));
-
-        if (existingComment.length > 0) {
+        if (existingCommentIds.has(commentId)) {
           // Already processed this comment
           continue;
         }
 
-        console.log(`   💬 New comment from ${comment.authorDisplayName}: "${comment.textDisplay?.substring(0, 50)}..."`);
+        logger.info({
+          commentId,
+          author: comment.authorDisplayName,
+          textPreview: comment.textDisplay?.substring(0, 50)
+        }, 'New comment found');
 
         // Save comment to database
         if (useSQLite) {
@@ -107,10 +131,10 @@ export async function checkAndReplyToYouTubeComments() {
             .where(eq(youtubeCommentsTablePostgres.commentId, commentId));
         }
 
-        console.log(`   ✅ Replied: "${replyText}"`);
+        logger.info({ commentId, replyText }, 'Replied to comment');
         */
 
-        console.log(`   💾 Saved comment to database (reply disabled by default)`);
+        logger.info({ commentId }, 'Saved comment to database (reply disabled by default)');
       }
 
       // Update last checked timestamp
@@ -127,9 +151,9 @@ export async function checkAndReplyToYouTubeComments() {
       }
     }
 
-    console.log('✅ YouTube comment checking job completed');
+    logger.info('YouTube comment checking job completed');
   } catch (error) {
-    console.error('❌ Error in YouTube comment checking job:', error);
+    logger.error({ error }, 'Error in YouTube comment checking job');
     throw error;
   }
 }
@@ -138,7 +162,7 @@ export async function checkAndReplyToYouTubeComments() {
  * Track a new video for comment monitoring
  */
 export async function trackYouTubeVideo(videoId: string) {
-  console.log(`🎯 Starting to track video: ${videoId}`);
+  logger.info({ videoId }, 'Starting to track video');
 
   try {
     // Check if already tracking
@@ -153,7 +177,7 @@ export async function trackYouTubeVideo(videoId: string) {
           .where(eq(youtubeVideosTablePostgres.videoId, videoId));
 
     if (existing.length > 0) {
-      console.log('   Already tracking this video');
+      logger.info({ videoId }, 'Already tracking this video');
       return existing[0];
     }
 
@@ -185,10 +209,10 @@ export async function trackYouTubeVideo(videoId: string) {
           publishedAt: snippet?.publishedAt ? new Date(snippet.publishedAt) : null,
         });
 
-    console.log(`✅ Now tracking video: ${snippet?.title}`);
+    logger.info({ videoId, title: snippet?.title }, 'Now tracking video');
     return newVideo;
   } catch (error) {
-    console.error('❌ Error tracking video:', error);
+    logger.error({ error, videoId }, 'Error tracking video');
     throw error;
   }
 }
@@ -197,7 +221,7 @@ export async function trackYouTubeVideo(videoId: string) {
  * Fetch and save recent comments for analysis (no replies)
  */
 export async function fetchYouTubeCommentsForAnalysis() {
-  console.log('📊 Fetching YouTube comments for analysis...');
+  logger.info('Fetching YouTube comments for analysis');
 
   try {
     const videos = useSQLite
@@ -205,12 +229,37 @@ export async function fetchYouTubeCommentsForAnalysis() {
       : await (db as ReturnType<typeof import('drizzle-orm/node-postgres').drizzle>).select().from(youtubeVideosTablePostgres);
 
     if (videos.length === 0) {
-      console.log('   No videos being tracked');
+      logger.info('No videos being tracked');
       return;
     }
 
     for (const video of videos) {
       const commentThreads = await getVideoComments(video.videoId, 100);
+
+      // Extract all comment IDs for batch query (fixes N+1 query issue)
+      const allCommentIds: string[] = [];
+      for (const thread of commentThreads) {
+        const commentId = thread.snippet?.topLevelComment?.id;
+        if (commentId) {
+          allCommentIds.push(commentId);
+        }
+      }
+
+      // Batch query to check existing comments
+      const existingComments = allCommentIds.length > 0
+        ? useSQLite
+          ? await (db as ReturnType<typeof import('drizzle-orm/better-sqlite3').drizzle>)
+              .select({ commentId: youtubeCommentsTableSQLite.commentId })
+              .from(youtubeCommentsTableSQLite)
+              .where(inArray(youtubeCommentsTableSQLite.commentId, allCommentIds))
+          : await (db as ReturnType<typeof import('drizzle-orm/node-postgres').drizzle>)
+              .select({ commentId: youtubeCommentsTablePostgres.commentId })
+              .from(youtubeCommentsTablePostgres)
+              .where(inArray(youtubeCommentsTablePostgres.commentId, allCommentIds))
+        : [];
+
+      // Create a Set for O(1) lookup
+      const existingCommentIds = new Set(existingComments.map(c => c.commentId));
 
       let newCount = 0;
 
@@ -221,17 +270,7 @@ export async function fetchYouTubeCommentsForAnalysis() {
         const commentId = thread.snippet?.topLevelComment?.id;
         if (!commentId) continue;
 
-        const existingComment = useSQLite
-          ? await (db as ReturnType<typeof import('drizzle-orm/better-sqlite3').drizzle>)
-              .select()
-              .from(youtubeCommentsTableSQLite)
-              .where(eq(youtubeCommentsTableSQLite.commentId, commentId))
-          : await (db as ReturnType<typeof import('drizzle-orm/node-postgres').drizzle>)
-              .select()
-              .from(youtubeCommentsTablePostgres)
-              .where(eq(youtubeCommentsTablePostgres.commentId, commentId));
-
-        if (existingComment.length === 0) {
+        if (!existingCommentIds.has(commentId)) {
           if (useSQLite) {
             await (db as ReturnType<typeof import('drizzle-orm/better-sqlite3').drizzle>).insert(youtubeCommentsTableSQLite).values({
               commentId,
@@ -255,12 +294,12 @@ export async function fetchYouTubeCommentsForAnalysis() {
         }
       }
 
-      console.log(`   📹 ${video.title}: ${newCount} new comments saved`);
+      logger.info({ videoId: video.videoId, title: video.title, newCount }, 'Saved new comments');
     }
 
-    console.log('✅ Comment analysis fetch completed');
+    logger.info('Comment analysis fetch completed');
   } catch (error) {
-    console.error('❌ Error fetching comments:', error);
+    logger.error({ error }, 'Error fetching comments');
     throw error;
   }
 }

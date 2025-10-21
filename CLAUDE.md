@@ -172,13 +172,12 @@ Production-ready infrastructure for autopilot operation. All components are opti
 - **Stats**: `getRateLimiterStats(limiter)` shows queued/running jobs
 
 #### Persistent Logging (`src/lib/logger.ts`)
-- **Purpose**: Structured logging with automatic file rotation
-- **Library**: Pino + pino-roll
+- **Purpose**: Structured logging with file persistence
+- **Library**: Pino with native file streams
 - **Log Files**:
   - `logs/app.log` - All logs (info and above)
   - `logs/error.log` - Errors only
-  - Rotation: Daily at midnight + 10MB size limit
-  - Retention: Last 7 days automatically kept
+  - Rotation: Handled by Railway's built-in log management
 - **Streams**: Console (development) + Files (production)
 - **Configuration**:
   - `LOG_LEVEL` env var (debug, info, warn, error)
