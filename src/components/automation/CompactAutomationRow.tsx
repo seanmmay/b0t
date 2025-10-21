@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Play, Loader2, Settings2, Check, X, Filter } from 'lucide-react';
+import { Play, Loader2, Settings2, Check, X, Filter, History } from 'lucide-react';
 import { SchedulePicker } from './SchedulePicker';
 import { Input } from '@/components/ui/input';
+import { ReplyHistoryTable } from '@/components/twitter/ReplyHistoryTable';
+import { showTwitter403Error, showTwitter429Error, showApiError, showTwitterSuccess } from '@/lib/toast-helpers';
 
 interface CompactAutomationRowProps {
   title: string;
@@ -30,10 +32,11 @@ export function CompactAutomationRow({
   const [promptOpen, setPromptOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // Search filter states (for reply-to-tweets job)
-  const [minimumLikes, setMinimumLikes] = useState(5);
-  const [minimumRetweets, setMinimumRetweets] = useState(2);
+  const [minimumLikes, setMinimumLikes] = useState(50);
+  const [minimumRetweets, setMinimumRetweets] = useState(10);
   const [searchFromToday, setSearchFromToday] = useState(true);
   const [removeLinks, setRemoveLinks] = useState(true);
   const [removeMedia, setRemoveMedia] = useState(true);
@@ -43,16 +46,46 @@ export function CompactAutomationRow({
     setTestResult(null);
 
     try {
-      const response = await fetch(`/api/jobs/trigger?job=${jobName}`, { method: 'POST' });
+      // Build request body with filters (only for reply-to-tweets)
+      const body = jobName === 'reply-to-tweets'
+        ? {
+            minimumLikesCount: minimumLikes,
+            minimumRetweetsCount: minimumRetweets,
+            searchFromToday,
+            removePostsWithLinks: removeLinks,
+            removePostsWithMedia: removeMedia,
+          }
+        : {};
+
+      const response = await fetch(`/api/jobs/trigger?job=${jobName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
       const data = await response.json();
 
       if (response.ok) {
         setTestResult({ success: true, message: data.message });
+        showTwitterSuccess(data.message || 'Job completed successfully');
       } else {
         setTestResult({ success: false, message: data.error || 'Unknown error' });
+
+        // Handle specific error codes with user-friendly toasts
+        if (response.status === 403) {
+          showTwitter403Error(data.details || data.error);
+        } else if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          showTwitter429Error(retryAfter ? parseInt(retryAfter) : undefined);
+        } else {
+          showApiError(data.error || data.details || 'Job failed to execute');
+        }
       }
     } catch (error) {
-      setTestResult({ success: false, message: `Failed: ${error}` });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setTestResult({ success: false, message: `Failed: ${errorMessage}` });
+      showApiError(`Failed to execute job: ${errorMessage}`);
     } finally {
       setTesting(false);
     }
@@ -216,6 +249,28 @@ export function CompactAutomationRow({
               <Button onClick={() => setFiltersOpen(false)} className="h-8 text-xs">
                 Save Filters
               </Button>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* History Button (only for reply-to-tweets) */}
+        {jobName === 'reply-to-tweets' && (
+          <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                <History className="h-3 w-3" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[90vw] max-h-[85vh] bg-surface border-border overflow-hidden">
+              <DialogHeader>
+                <DialogTitle className="text-base font-black">Reply History</DialogTitle>
+                <DialogDescription className="text-xs text-secondary">
+                  View all tweets you&apos;ve replied to with engagement metrics
+                </DialogDescription>
+              </DialogHeader>
+              <div className="overflow-y-auto max-h-[calc(85vh-8rem)]">
+                <ReplyHistoryTable />
+              </div>
             </DialogContent>
           </Dialog>
         )}

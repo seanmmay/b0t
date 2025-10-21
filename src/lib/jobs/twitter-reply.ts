@@ -11,9 +11,18 @@ import { logger } from '@/lib/logger';
  * Configuration:
  * - Set TWITTER_REPLY_SEARCH_QUERY in your environment
  * - Optionally set TWITTER_REPLY_SYSTEM_PROMPT for custom AI behavior
+ * - Or pass params directly when calling from API
  */
 
-export async function replyToTweetsJob() {
+interface ReplyJobParams {
+  minimumLikesCount?: number;
+  minimumRetweetsCount?: number;
+  searchFromToday?: boolean;
+  removePostsWithLinks?: boolean;
+  removePostsWithMedia?: boolean;
+}
+
+export async function replyToTweetsJob(params?: ReplyJobParams) {
   const searchQuery = process.env.TWITTER_REPLY_SEARCH_QUERY;
 
   if (!searchQuery) {
@@ -28,6 +37,13 @@ export async function replyToTweetsJob() {
     const result = await replyToTweetsWorkflow({
       searchQuery,
       systemPrompt: process.env.TWITTER_REPLY_SYSTEM_PROMPT,
+      searchParams: params ? {
+        minimumLikesCount: params.minimumLikesCount,
+        minimumRetweetsCount: params.minimumRetweetsCount,
+        searchFromToday: params.searchFromToday,
+        removePostsWithLinks: params.removePostsWithLinks,
+        removePostsWithMedia: params.removePostsWithMedia,
+      } : undefined,
     });
 
     logger.info('✅ Reply to Tweets workflow completed successfully');

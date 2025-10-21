@@ -3,6 +3,8 @@ import { searchTwitter, type Tweet } from '@/lib/rapidapi/twitter';
 import { replyToTweet } from '@/lib/twitter';
 import { generateTweetReply } from '@/lib/openai';
 import { logger } from '@/lib/logger';
+import { db, useSQLite } from '@/lib/db';
+import { tweetRepliesTableSQLite, tweetRepliesTablePostgres } from '@/lib/schema';
 
 /**
  * Reply to Tweets Workflow
@@ -193,6 +195,42 @@ export async function replyToTweetsWorkflow(config: WorkflowConfig) {
       );
 
       return { ...ctx, replyResult: result };
+    })
+    .step('save-to-database', async (ctx): Promise<WorkflowContext> => {
+      if (!ctx.selectedTweet || !ctx.generatedReply) {
+        throw new Error('Missing tweet or reply');
+      }
+
+      logger.info({ tweetId: ctx.selectedTweet.tweet_id }, '💾 Saving reply to database');
+
+      const replyData = {
+        originalTweetId: ctx.selectedTweet.tweet_id,
+        originalTweetText: ctx.selectedTweet.text,
+        originalTweetAuthor: ctx.selectedTweet.user_screen_name || '',
+        originalTweetAuthorName: ctx.selectedTweet.user_name || null,
+        originalTweetLikes: ctx.selectedTweet.likes || 0,
+        originalTweetRetweets: ctx.selectedTweet.retweets || 0,
+        originalTweetReplies: ctx.selectedTweet.replies || 0,
+        originalTweetViews: ctx.selectedTweet.views || 0,
+        ourReplyText: ctx.generatedReply,
+        ourReplyTweetId: isDryRun ? null : (ctx.replyResult as { id?: string })?.id || null,
+        status: isDryRun ? 'pending' : 'posted',
+        repliedAt: isDryRun ? null : new Date(),
+      };
+
+      if (useSQLite) {
+        await (db as ReturnType<typeof import('drizzle-orm/better-sqlite3').drizzle>)
+          .insert(tweetRepliesTableSQLite)
+          .values(replyData);
+      } else {
+        await (db as ReturnType<typeof import('drizzle-orm/node-postgres').drizzle>)
+          .insert(tweetRepliesTablePostgres)
+          .values(replyData);
+      }
+
+      logger.info({ tweetId: ctx.selectedTweet.tweet_id }, '✅ Reply saved to database');
+
+      return ctx;
     })
     .execute(initialContext);
 

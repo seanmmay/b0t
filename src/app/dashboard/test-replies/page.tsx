@@ -5,6 +5,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Heart, Repeat2, MessageCircle, Eye, FlaskConical, AlertTriangle, CheckCircle } from 'lucide-react';
+import { showTwitter403Error, showTwitter429Error, showApiError } from '@/lib/toast-helpers';
 
 interface TestResult {
   selectedTweet: {
@@ -29,8 +30,8 @@ export default function TestRepliesPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Search filter controls
-  const [minimumLikes, setMinimumLikes] = useState(5);
-  const [minimumRetweets, setMinimumRetweets] = useState(2);
+  const [minimumLikes, setMinimumLikes] = useState(50);
+  const [minimumRetweets, setMinimumRetweets] = useState(10);
   const [searchFromToday, setSearchFromToday] = useState(true);
   const [removeLinks, setRemoveLinks] = useState(true);
   const [removeMedia, setRemoveMedia] = useState(true);
@@ -60,12 +61,27 @@ export default function TestRepliesPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.details || data.error || 'Failed to run test');
+        const errorMessage = data.details || data.error || 'Failed to run test';
+        setError(errorMessage);
+
+        // Show user-friendly toast based on error type
+        if (response.status === 403) {
+          showTwitter403Error(data.details || data.error);
+        } else if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          showTwitter429Error(retryAfter ? parseInt(retryAfter) : undefined);
+        } else {
+          showApiError(errorMessage);
+        }
+
+        throw new Error(errorMessage);
       }
 
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setError(errorMessage);
+      // Toast is already shown above, no need to show again
     } finally {
       setLoading(false);
     }

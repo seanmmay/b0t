@@ -109,6 +109,36 @@ export const oauthStateTableSQLite = sqliteTable('oauth_state', {
     .default(sql`(unixepoch())`),
 });
 
+// Tweet replies table for SQLite (tracks our replies to tweets)
+export const tweetRepliesTableSQLite = sqliteTable('tweet_replies', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  originalTweetId: text('original_tweet_id').notNull(),
+  originalTweetText: text('original_tweet_text').notNull(),
+  originalTweetAuthor: text('original_tweet_author').notNull(), // username
+  originalTweetAuthorName: text('original_tweet_author_name'), // display name
+  originalTweetLikes: integer('original_tweet_likes').default(0),
+  originalTweetRetweets: integer('original_tweet_retweets').default(0),
+  originalTweetReplies: integer('original_tweet_replies').default(0),
+  originalTweetViews: integer('original_tweet_views').default(0),
+  ourReplyText: text('our_reply_text').notNull(),
+  ourReplyTweetId: text('our_reply_tweet_id'), // null if dry-run or failed
+  status: text('status').notNull().default('pending'), // pending, posted, failed
+  createdAt: integer('created_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(unixepoch())`),
+  repliedAt: integer('replied_at', { mode: 'timestamp' }),
+});
+
+// App settings table for SQLite (stores user preferences and configurations)
+export const appSettingsTableSQLite = sqliteTable('app_settings', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  key: text('key').notNull().unique(),
+  value: text('value').notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 // For PostgreSQL (production)
 export const tweetsTablePostgres = pgTable('tweets', {
   id: serial('id').primaryKey(),
@@ -202,8 +232,49 @@ export const oauthStateTablePostgres = pgTable('oauth_state', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// Tweet replies table for PostgreSQL (tracks our replies to tweets)
+export const tweetRepliesTablePostgres = pgTable('tweet_replies', {
+  id: serial('id').primaryKey(),
+  originalTweetId: varchar('original_tweet_id', { length: 255 }).notNull(),
+  originalTweetText: pgText('original_tweet_text').notNull(),
+  originalTweetAuthor: varchar('original_tweet_author', { length: 255 }).notNull(), // username
+  originalTweetAuthorName: varchar('original_tweet_author_name', { length: 255 }), // display name
+  originalTweetLikes: pgInteger('original_tweet_likes').default(0),
+  originalTweetRetweets: pgInteger('original_tweet_retweets').default(0),
+  originalTweetReplies: pgInteger('original_tweet_replies').default(0),
+  originalTweetViews: pgInteger('original_tweet_views').default(0),
+  ourReplyText: pgText('our_reply_text').notNull(),
+  ourReplyTweetId: varchar('our_reply_tweet_id', { length: 255 }), // null if dry-run or failed
+  status: varchar('status', { length: 50 }).notNull().default('pending'), // pending, posted, failed
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  repliedAt: timestamp('replied_at'),
+});
+
+// App settings table for PostgreSQL (stores user preferences and configurations)
+export const appSettingsTablePostgres = pgTable('app_settings', {
+  id: serial('id').primaryKey(),
+  key: varchar('key', { length: 255 }).notNull().unique(),
+  value: pgText('value').notNull(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});
+
+// Determine which database to use based on environment
+const useSQLite = !process.env.DATABASE_URL;
+
 // Export the appropriate tables based on environment
 // This will be imported and used throughout the app
+export const tweetsTable = useSQLite ? tweetsTableSQLite : tweetsTablePostgres;
+export const aiResponsesTable = useSQLite ? aiResponsesTableSQLite : aiResponsesTablePostgres;
+export const usersTable = useSQLite ? usersTableSQLite : usersTablePostgres;
+export const accountsTable = useSQLite ? accountsTableSQLite : accountsTablePostgres;
+export const sessionsTable = useSQLite ? sessionsTableSQLite : sessionsTablePostgres;
+export const verificationTokensTable = useSQLite ? verificationTokensTableSQLite : verificationTokensTablePostgres;
+export const youtubeVideosTable = useSQLite ? youtubeVideosTableSQLite : youtubeVideosTablePostgres;
+export const youtubeCommentsTable = useSQLite ? youtubeCommentsTableSQLite : youtubeCommentsTablePostgres;
+export const oauthStateTable = useSQLite ? oauthStateTableSQLite : oauthStateTablePostgres;
+export const tweetRepliesTable = useSQLite ? tweetRepliesTableSQLite : tweetRepliesTablePostgres;
+export const appSettingsTable = useSQLite ? appSettingsTableSQLite : appSettingsTablePostgres;
+
 export type Tweet = typeof tweetsTableSQLite.$inferSelect;
 export type NewTweet = typeof tweetsTableSQLite.$inferInsert;
 export type AIResponse = typeof aiResponsesTableSQLite.$inferSelect;
@@ -220,3 +291,7 @@ export type YouTubeComment = typeof youtubeCommentsTableSQLite.$inferSelect;
 export type NewYouTubeComment = typeof youtubeCommentsTableSQLite.$inferInsert;
 export type OAuthState = typeof oauthStateTableSQLite.$inferSelect;
 export type NewOAuthState = typeof oauthStateTableSQLite.$inferInsert;
+export type TweetReply = typeof tweetRepliesTableSQLite.$inferSelect;
+export type NewTweetReply = typeof tweetRepliesTableSQLite.$inferInsert;
+export type AppSetting = typeof appSettingsTableSQLite.$inferSelect;
+export type NewAppSetting = typeof appSettingsTableSQLite.$inferInsert;

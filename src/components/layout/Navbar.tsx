@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Twitter, Youtube, Instagram, Settings, Cat, FlaskConical } from 'lucide-react';
+import { LayoutDashboard, Twitter, Youtube, Instagram, Settings, Cat, FlaskConical, BarChart3 } from 'lucide-react';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Test Replies', href: '/dashboard/test-replies', icon: FlaskConical },
+  { name: 'Limits', href: '/dashboard/limits', icon: BarChart3 },
   { name: 'Twitter', href: '/twitter', icon: Twitter },
   { name: 'YouTube', href: '/youtube', icon: Youtube },
   { name: 'Instagram', href: '/instagram', icon: Instagram },

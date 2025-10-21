@@ -32,16 +32,16 @@ import { triggerJobSchema } from '@/lib/validations';
  * - fetch-youtube-comments-analysis
  */
 
-const availableJobs: Record<string, () => Promise<void>> = {
-  'example-every-5-minutes': exampleEvery5Minutes,
-  'example-hourly': exampleHourly,
-  'example-daily': exampleDaily,
-  'generate-scheduled-content': generateScheduledContent,
-  'analyze-trends': analyzeTrends,
-  'ai-tweet-generation': generateAndPostTweet,
-  'reply-to-tweets': replyToTweetsJob,
-  'check-youtube-comments': checkAndReplyToYouTubeComments,
-  'fetch-youtube-comments-analysis': fetchYouTubeCommentsForAnalysis,
+const availableJobs: Record<string, (params?: unknown) => Promise<void>> = {
+  'example-every-5-minutes': exampleEvery5Minutes as (params?: unknown) => Promise<void>,
+  'example-hourly': exampleHourly as (params?: unknown) => Promise<void>,
+  'example-daily': exampleDaily as (params?: unknown) => Promise<void>,
+  'generate-scheduled-content': generateScheduledContent as (params?: unknown) => Promise<void>,
+  'analyze-trends': analyzeTrends as (params?: unknown) => Promise<void>,
+  'ai-tweet-generation': generateAndPostTweet as (params?: unknown) => Promise<void>,
+  'reply-to-tweets': replyToTweetsJob as (params?: unknown) => Promise<void>,
+  'check-youtube-comments': checkAndReplyToYouTubeComments as (params?: unknown) => Promise<void>,
+  'fetch-youtube-comments-analysis': fetchYouTubeCommentsForAnalysis as (params?: unknown) => Promise<void>,
 };
 
 export async function POST(request: NextRequest) {
@@ -52,6 +52,17 @@ export async function POST(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const jobName = searchParams.get('job');
+
+    // Read optional body params (for jobs that need configuration)
+    let bodyParams = {};
+    try {
+      const body = await request.text();
+      if (body) {
+        bodyParams = JSON.parse(body);
+      }
+    } catch {
+      // Body parsing failed or empty, continue with empty params
+    }
 
     // Validate input with Zod
     const validation = triggerJobSchema.safeParse({ job: jobName });
@@ -82,9 +93,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    logger.info({ job: validatedJobName }, `Manually triggering job: ${validatedJobName}`);
+    logger.info({ job: validatedJobName, params: bodyParams }, `Manually triggering job: ${validatedJobName}`);
 
-    await jobFunction();
+    await jobFunction(bodyParams);
 
     logApiRequest('POST', '/api/jobs/trigger', 200);
 
