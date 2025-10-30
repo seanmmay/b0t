@@ -294,7 +294,29 @@ export function WorkflowTile({
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-4">
         <div className="flex-1 min-w-0">
-          <h3 className="font-black text-base tracking-tight mb-1">{title}</h3>
+          <div className="flex items-center gap-2 mb-1">
+            <h3 className="font-black text-base tracking-tight">{title}</h3>
+            {/* Test Button */}
+            <Button
+              onClick={handleTest}
+              disabled={testing}
+              variant="outline"
+              size="sm"
+              className="h-6 px-2 text-[10px] gap-1"
+            >
+              {testing ? (
+                <>
+                  <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                  <span>Running...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="h-2.5 w-2.5" />
+                  <span>Test</span>
+                </>
+              )}
+            </Button>
+          </div>
           {description && (
             <p className="text-xs text-secondary line-clamp-2">{description}</p>
           )}
@@ -318,27 +340,6 @@ export function WorkflowTile({
 
       {/* Action Buttons */}
       <div className="flex flex-wrap items-center gap-2 mt-auto">
-        {/* Test Button */}
-        <Button
-          onClick={handleTest}
-          disabled={testing}
-          variant="outline"
-          size="sm"
-          className="h-8 px-3 text-xs gap-1.5"
-        >
-          {testing ? (
-            <>
-              <Loader2 className="h-3 w-3 animate-spin" />
-              <span>Running...</span>
-            </>
-          ) : (
-            <>
-              <Play className="h-3 w-3" />
-              <span>Test</span>
-            </>
-          )}
-        </Button>
-
         {/* Schedule Button */}
         <Dialog open={scheduleOpen} onOpenChange={setScheduleOpen}>
           <DialogTrigger asChild>

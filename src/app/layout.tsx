@@ -4,7 +4,6 @@ import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { AppLoader } from "@/components/ui/app-loader";
-import { ChatbotWidget } from "@/components/ui/chatbot-widget";
 
 const interHeading = Inter({
   weight: ["500", "600", "700"],
@@ -44,7 +43,6 @@ export default function RootLayout({
         <AppLoader />
         <SessionProvider>
           {children}
-          <ChatbotWidget />
         </SessionProvider>
         <Toaster />
       </body>
