@@ -97,7 +97,7 @@ export function WorkflowCredentialsStatus({ workflowId }: WorkflowCredentialsSta
     const top = window.screen.height / 2 - height / 2;
 
     window.open(
-      `/api/auth/${platform}`,
+      `/api/auth/${platform}/authorize`,
       `${platform}-auth`,
       `width=${width},height=${height},left=${left},top=${top}`
     );

@@ -4,7 +4,6 @@
  */
 
 import { executeWorkflow } from '@/lib/workflows/executor';
-import { logger } from '@/lib/logger';
 
 const workflowId = process.argv[2];
 const userId = process.argv[3] || '1'; // Default to test user
