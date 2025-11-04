@@ -81,3 +81,96 @@ export type TriggerJob = z.infer<typeof triggerJobSchema>;
 export type CronSchedule = z.infer<typeof cronScheduleSchema>;
 export type Prompt = z.infer<typeof promptSchema>;
 export type AutomationConfig = z.infer<typeof automationConfigSchema>;
+
+// Credential validation schemas
+export const credentialTypeSchema = z.enum(['api_key', 'token', 'secret', 'connection_string']);
+
+// Platform-specific credential validators
+const openaiKeySchema = z.string().regex(/^sk-[a-zA-Z0-9]{20,}$/, 'Invalid OpenAI API key format (must start with sk-)');
+const anthropicKeySchema = z.string().regex(/^sk-ant-[a-zA-Z0-9_-]{95,}$/, 'Invalid Anthropic API key format (must start with sk-ant-)');
+const stripeKeySchema = z.string().regex(/^(sk|pk)_(test|live)_[a-zA-Z0-9]{24,}$/, 'Invalid Stripe key format');
+const slackTokenSchema = z.string().regex(/^xox[abp]-[a-zA-Z0-9-]+$/, 'Invalid Slack token format');
+const discordTokenSchema = z.string().min(50).max(100);
+const telegramTokenSchema = z.string().regex(/^[0-9]{8,10}:[a-zA-Z0-9_-]{35}$/, 'Invalid Telegram bot token format');
+const githubTokenSchema = z.string().regex(/^(ghp|gho|ghu|ghs|ghr)_[a-zA-Z0-9]{36,}$/, 'Invalid GitHub token format');
+const redditTokenSchema = z.string().min(20);
+const resendKeySchema = z.string().regex(/^re_[a-zA-Z0-9]{32,}$/, 'Invalid Resend API key format');
+
+// Generic validators for unknown platforms
+const genericApiKeySchema = z.string().min(10, 'API key must be at least 10 characters').max(500, 'API key too long');
+const genericTokenSchema = z.string().min(10, 'Token must be at least 10 characters').max(500, 'Token too long');
+const genericSecretSchema = z.string().min(8, 'Secret must be at least 8 characters').max(500, 'Secret too long');
+const connectionStringSchema = z.string().min(10, 'Connection string must be at least 10 characters').max(2000, 'Connection string too long');
+
+// Platform-specific credential value validators
+const credentialValueValidators: Record<string, z.ZodString> = {
+  'openai': openaiKeySchema,
+  'anthropic': anthropicKeySchema,
+  'stripe': stripeKeySchema,
+  'slack': slackTokenSchema,
+  'discord': discordTokenSchema,
+  'telegram': telegramTokenSchema,
+  'github': githubTokenSchema,
+  'reddit': redditTokenSchema,
+  'resend': resendKeySchema,
+};
+
+/**
+ * Validates a credential value based on the platform
+ */
+export function validateCredentialValue(platform: string, value: string, type: string): { success: boolean; error?: string } {
+  const validator = credentialValueValidators[platform.toLowerCase()];
+
+  if (validator) {
+    const result = validator.safeParse(value);
+    if (!result.success) {
+      return { success: false, error: result.error.issues[0]?.message || 'Invalid credential format' };
+    }
+  } else {
+    // Use generic validators for unknown platforms
+    let genericValidator: z.ZodString;
+    switch (type) {
+      case 'api_key':
+        genericValidator = genericApiKeySchema;
+        break;
+      case 'token':
+        genericValidator = genericTokenSchema;
+        break;
+      case 'secret':
+        genericValidator = genericSecretSchema;
+        break;
+      case 'connection_string':
+        genericValidator = connectionStringSchema;
+        break;
+      default:
+        genericValidator = genericApiKeySchema;
+    }
+
+    const result = genericValidator.safeParse(value);
+    if (!result.success) {
+      return { success: false, error: result.error.issues[0]?.message || 'Invalid credential format' };
+    }
+  }
+
+  return { success: true };
+}
+
+// Credential creation schema
+export const createCredentialSchema = z.object({
+  platform: z.string().min(1, 'Platform is required').max(100, 'Platform name too long'),
+  name: z.string().min(1, 'Name is required').max(255, 'Name too long'),
+  value: z.string().min(1, 'Credential value is required'),
+  type: credentialTypeSchema,
+  metadata: z.record(z.string(), z.unknown()).optional(),
+}).superRefine((data, ctx) => {
+  const validation = validateCredentialValue(data.platform, data.value, data.type);
+  if (!validation.success) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: validation.error || 'Invalid credential format',
+      path: ['value'],
+    });
+  }
+});
+
+export type CreateCredential = z.infer<typeof createCredentialSchema>;

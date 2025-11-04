@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { storeCredential, listCredentials } from '@/lib/workflows/credentials';
 import { logger } from '@/lib/logger';
+import { createCredentialSchema } from '@/lib/validations';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,24 +43,31 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { platform, name, value, type, metadata } = body;
 
-    // Validate required fields
-    if (!platform || !name || !value || !type) {
+    // Validate request body with Zod
+    const validation = createCredentialSchema.safeParse(body);
+
+    if (!validation.success) {
+      const errors = validation.error.issues.map((err) => ({
+        field: err.path.join('.'),
+        message: err.message,
+      }));
+
+      logger.warn(
+        { userId: session.user.id, errors },
+        'Credential validation failed'
+      );
+
       return NextResponse.json(
-        { error: 'Missing required fields: platform, name, value, type' },
+        {
+          error: 'Validation failed',
+          details: errors,
+        },
         { status: 400 }
       );
     }
 
-    // Validate type
-    const validTypes = ['api_key', 'token', 'secret', 'connection_string'];
-    if (!validTypes.includes(type)) {
-      return NextResponse.json(
-        { error: `Invalid type. Must be one of: ${validTypes.join(', ')}` },
-        { status: 400 }
-      );
-    }
+    const { platform, name, value, type, metadata } = validation.data;
 
     const result = await storeCredential(session.user.id, {
       platform,
