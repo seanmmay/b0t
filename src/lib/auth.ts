@@ -59,6 +59,7 @@ declare module '@auth/core/jwt' {
 }
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  debug: false, // Disable debug warnings in development
   providers: [
     // Simple Email/Password Authentication
     // For single user app - credentials stored in environment variables
@@ -222,8 +223,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-
-  debug: process.env.NODE_ENV === 'development',
 });
 
 /**

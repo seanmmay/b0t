@@ -161,8 +161,36 @@ Users create workflows by chatting with Claude. Claude generates the workflow JS
 5. Show results
 
 **Module path format:** `category.module.function`
-- Categories: `communication`, `social`, `data`, `ai`, `utilities`, `payments`, `productivity`
-- Example: `utilities.datetime.formatDate` → `src/modules/utilities/datetime.ts` → `formatDate()`
+
+**Category Naming System:**
+The system supports both human-readable category names (with spaces) and folder names:
+- Category names in workflows can contain spaces (e.g., "social media", "developer tools")
+- The executor automatically normalizes these to folder names (e.g., `social` → `src/modules/social/`)
+- Both formats work: `social media.reddit.getPosts` and `social.reddit.getPosts` are equivalent
+
+**Available Categories:**
+- `communication` → Email, Slack, Discord, Telegram
+- `social media` → Twitter, Reddit, YouTube, Instagram, GitHub (maps to `social/` folder)
+- `ai` → OpenAI, Anthropic
+- `data` → MongoDB, PostgreSQL, Airtable, Google Sheets, Notion
+- `utilities` → HTTP, RSS, datetime, filesystem, CSV, images, PDF, XML, encryption, compression
+- `payments` → Stripe
+- `productivity` → Google Calendar
+- `data processing` → Data transformation utilities (maps to `dataprocessing/` folder)
+- `developer tools` → GitHub trending, etc. (maps to `devtools/` folder)
+- `e-commerce` → E-commerce integrations (maps to `ecommerce/` folder)
+- `lead generation` → Lead generation tools (maps to `leads/` folder)
+- `video automation` → Video processing (maps to `video/` folder)
+- `business` → Business tools
+- `content` → Content management
+- `external apis` → External API integrations (maps to `external-apis/` folder)
+
+**Examples:**
+- `utilities.datetime.formatDate` → `src/modules/utilities/datetime.ts` → `formatDate()`
+- `social media.reddit.getSubredditPosts` → `src/modules/social/reddit.ts` → `getSubredditPosts()`
+- `developer tools.github.getTrendingRepositories` → `src/modules/devtools/github.ts` → `getTrendingRepositories()`
+
+**Best Practice:** Use the human-readable category names (with spaces) in workflow definitions as shown in the module registry. The system will automatically handle the mapping.
 
 **Variable passing:** Use `{{variableName}}` to reference previous step outputs
 - `{{feed.items[0].title}}` - Access nested properties/arrays

@@ -208,62 +208,104 @@ export async function replyToComment(
 }
 
 /**
- * Get posts from subreddit
+ * Get posts from subreddit (works without authentication using public API)
  */
 export async function getSubredditPosts(
   subreddit: string,
   sort: 'hot' | 'new' | 'top' | 'rising' = 'hot',
   limit: number = 25
 ): Promise<RedditPost[]> {
-  if (!redditClient) {
-    throw new Error('Reddit client not initialized. Set Reddit credentials.');
-  }
-
   logger.info({ subreddit, sort, limit }, 'Fetching Reddit posts');
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sub = await (redditClient.getSubreddit(subreddit) as any);
+  // Use authenticated Snoowrap client if available
+  if (redditClient) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sub = await (redditClient.getSubreddit(subreddit) as any);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let listing: any;
-  switch (sort) {
-    case 'hot':
-      listing = await sub.getHot({ limit });
-      break;
-    case 'new':
-      listing = await sub.getNew({ limit });
-      break;
-    case 'top':
-      listing = await sub.getTop({ limit });
-      break;
-    case 'rising':
-      listing = await sub.getRising({ limit });
-      break;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let listing: any;
+    switch (sort) {
+      case 'hot':
+        listing = await sub.getHot({ limit });
+        break;
+      case 'new':
+        listing = await sub.getNew({ limit });
+        break;
+      case 'top':
+        listing = await sub.getTop({ limit });
+        break;
+      case 'rising':
+        listing = await sub.getRising({ limit });
+        break;
+    }
+
+    logger.info({ postCount: listing.length }, 'Reddit posts fetched (authenticated)');
+
+    return listing.map((post: {
+      id: string;
+      title: string;
+      selftext: string;
+      url: string;
+      author: { name: string };
+      subreddit: { display_name: string };
+      score: number;
+      num_comments: number;
+      permalink: string;
+    }) => ({
+      id: post.id,
+      title: post.title,
+      selftext: post.selftext,
+      url: post.url,
+      author: post.author.name,
+      subreddit: post.subreddit.display_name,
+      score: post.score,
+      numComments: post.num_comments,
+      permalink: `https://reddit.com${post.permalink}`,
+    }));
   }
 
-  logger.info({ postCount: listing.length }, 'Reddit posts fetched');
+  // Fall back to public JSON API (no authentication required)
+  logger.info('Using public Reddit JSON API (no authentication)');
 
-  return listing.map((post: {
-    id: string;
-    title: string;
-    selftext: string;
-    url: string;
-    author: { name: string };
-    subreddit: { display_name: string };
-    score: number;
-    num_comments: number;
-    permalink: string;
-  }) => ({
-    id: post.id,
-    title: post.title,
-    selftext: post.selftext,
-    url: post.url,
-    author: post.author.name,
-    subreddit: post.subreddit.display_name,
-    score: post.score,
-    numComments: post.num_comments,
-    permalink: `https://reddit.com${post.permalink}`,
-  }));
+  const url = `https://www.reddit.com/r/${subreddit}/${sort}.json?limit=${limit}`;
+
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Accept': 'application/json, text/html',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Reddit API error: ${response.status} ${response.statusText}`);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = await response.json();
+  const posts = data.data.children;
+
+  logger.info({ postCount: posts.length }, 'Reddit posts fetched (public API)');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return posts.map((item: any) => {
+    const post = item.data;
+    return {
+      id: post.id,
+      title: post.title,
+      selftext: post.selftext || '',
+      url: post.url,
+      author: post.author,
+      subreddit: post.subreddit,
+      score: post.score,
+      numComments: post.num_comments,
+      permalink: `https://reddit.com${post.permalink}`,
+    };
+  });
 }
 
 /**

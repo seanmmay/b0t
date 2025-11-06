@@ -39,7 +39,8 @@ description: Generate and execute a custom workflow from natural language descri
 - `update-workflow.ts <id> --trigger chat --status active` - Modify workflow
 - `clone-workflow.ts <id> --name "New Name"` - Duplicate workflow
 
-**Categories:** communication, social, data, ai, utilities, payments, productivity
+**Categories:** communication, social media, data, ai, utilities, payments, productivity, data processing, developer tools, e-commerce, lead generation, video automation, business, content, external apis
+*(Category names may contain spaces - system auto-normalizes to folder names)*
 
 ## Workflow JSON Structure
 
@@ -62,7 +63,7 @@ description: Generate and execute a custom workflow from natural language descri
     "steps": [
       {
         "id": "step1",
-        "module": "category.module.function",  // lowercase: ai.ai-sdk.chat
+        "module": "category.module.function",  // e.g., "social media.reddit.getPosts"
         "inputs": {
           // For chat workflows, use messages array format:
           "messages": [
@@ -89,7 +90,7 @@ description: Generate and execute a custom workflow from natural language descri
 
 **Critical:**
 - **`trigger` is TOP LEVEL** - Same level as `config`, NOT inside it!
-- Module paths: `category.module.function` (all lowercase)
+- Module paths: `category.module.function` (e.g., `social media.reddit.getPosts`)
 - Variable refs: `{{varName}}`, `{{data.items[0].title}}`
 - `version` required (use "1.0")
 - **`trigger` is REQUIRED** - Infer from user request:

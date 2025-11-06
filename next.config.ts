@@ -15,6 +15,7 @@ const nextConfig: NextConfig = {
 
   // Exclude packages with native dependencies from webpack bundling
   // This fixes build errors with discord.js and other native modules
+  // Note: ioredis and bullmq are NOT in this list to avoid Turbopack conflicts
   serverExternalPackages: [
     'discord.js',
     'zlib-sync',
@@ -24,13 +25,17 @@ const nextConfig: NextConfig = {
     'mongodb',
     'mysql2',
     'pg',
-    'ioredis',
     'snoowrap',
     'bufferutil',
     'utf-8-validate',
+    '@node-rs/argon2',
+    '@node-rs/bcrypt',
   ],
 
   // Configure webpack to ignore native modules and optional dependencies
+  // Note: This config is only used in production builds (npm run build)
+  // During dev (npm run dev with --turbopack), webpack config is ignored
+  // The one-time warning "Webpack is configured while Turbopack is not" is expected and harmless
   webpack: (config, { isServer }) => {
     if (isServer) {
       // Don't bundle native modules on server
@@ -42,19 +47,13 @@ const nextConfig: NextConfig = {
       });
     }
 
-    // Ignore optional dependencies that aren't installed
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'bufferutil': false,
-      'utf-8-validate': false,
-    };
-
-    // Suppress warnings about missing optional dependencies and conflicting exports
+    // Suppress warnings about missing optional dependencies, conflicting exports, and package externals
     config.ignoreWarnings = [
       /Module not found.*bufferutil/,
       /Module not found.*utf-8-validate/,
       /conflicting star exports/,
       /A Node\.js API is used/,
+      /Package ioredis can't be external/,
     ];
 
     return config;

@@ -113,7 +113,7 @@ export async function executeWorkflow(
         id: runId,
         workflowId,
         userId,
-        organizationId: workflow.organizationId || null,
+        organizationId: workflow.organizationId ? workflow.organizationId : null,
         status: 'running',
         triggerType,
         triggerData: triggerData ? JSON.stringify(triggerData) : null,
@@ -384,9 +384,37 @@ function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
 }
 
 /**
+ * Map category display names to folder names
+ * The registry uses display names like "Social Media", but folders are named "social"
+ */
+const CATEGORY_FOLDER_MAP: Record<string, string> = {
+  'communication': 'communication',
+  'social media': 'social',
+  'ai': 'ai',
+  'data': 'data',
+  'utilities': 'utilities',
+  'payments': 'payments',
+  'productivity': 'productivity',
+  'business': 'business',
+  'content': 'content',
+  'data processing': 'dataprocessing',
+  'developer tools': 'devtools',
+  'dev tools': 'devtools',
+  'e-commerce': 'ecommerce',
+  'ecommerce': 'ecommerce',
+  'lead generation': 'leads',
+  'leads': 'leads',
+  'video automation': 'video',
+  'video': 'video',
+  'external apis': 'external-apis',
+  'external-apis': 'external-apis',
+};
+
+/**
  * Execute a module function dynamically
  * Module path format: category.module.function
  * Example: utilities.rss.parseFeed → src/modules/utilities/rss.ts → parseFeed()
+ * Example: social media.reddit.getSubredditPosts → src/modules/social/reddit.ts → getSubredditPosts()
  */
 async function executeModuleFunction(
   modulePath: string,
@@ -394,52 +422,129 @@ async function executeModuleFunction(
 ): Promise<unknown> {
   logger.info({ modulePath, inputs }, 'Executing module function');
 
-  const [category, moduleName, functionName] = modulePath.split('.');
+  // Parse module path - need to handle category names with spaces
+  // Split by '.' and try to match against known category names
+  const parts = modulePath.split('.');
 
-  if (!category || !moduleName || !functionName) {
-    throw new Error(`Invalid module path: ${modulePath}`);
+  let categoryName: string | undefined;
+  let moduleName: string | undefined;
+  let functionName: string | undefined;
+
+  // Try different combinations to find a valid category
+  if (parts.length >= 3) {
+    // Try 2-word category first (e.g., "social media")
+    if (parts.length >= 4) {
+      const twoWordCategory = `${parts[0]} ${parts[1]}`.toLowerCase();
+      if (CATEGORY_FOLDER_MAP[twoWordCategory]) {
+        categoryName = CATEGORY_FOLDER_MAP[twoWordCategory];
+        moduleName = parts[2];
+        functionName = parts[3];
+      }
+    }
+
+    // Try 1-word category if 2-word didn't match
+    if (!categoryName) {
+      const oneWordCategory = parts[0].toLowerCase();
+      if (CATEGORY_FOLDER_MAP[oneWordCategory]) {
+        categoryName = CATEGORY_FOLDER_MAP[oneWordCategory];
+        moduleName = parts[1];
+        functionName = parts[2];
+      }
+    }
+  }
+
+  if (!categoryName || !moduleName || !functionName) {
+    throw new Error(`Invalid module path: ${modulePath}. Expected format: category.module.function`);
   }
 
   try {
     // Dynamic import of module
-    const moduleFile = await import(`@/modules/${category}/${moduleName}`);
+    const moduleFile = await import(`@/modules/${categoryName}/${moduleName}`);
 
     if (!moduleFile[functionName]) {
-      throw new Error(`Function ${functionName} not found in module ${category}/${moduleName}`);
+      throw new Error(`Function ${functionName} not found in module ${categoryName}/${moduleName}`);
     }
 
     const func = moduleFile[functionName];
 
     // Call the function with inputs
-    // Pass parameters as positional arguments based on the inputs object
+    // Determine if we should pass as object or spread parameters
+    const func_str = func.toString();
+    const paramMatch = func_str.match(/\(([^)]*)\)/);
+    const params = paramMatch?.[1]?.trim() || '';
+
+    // If function has a single parameter with object destructuring, pass as object
+    // Examples: "({ subreddit, limit })" or "options: RedditSubmitOptions"
+    const hasObjectParam = params.startsWith('{') || (params.includes(':') && !params.includes(','));
+
     const inputKeys = Object.keys(inputs);
 
     if (inputKeys.length === 0) {
       // No parameters
       return await func();
-    } else if (inputKeys.length === 1) {
+    } else if (inputKeys.length === 1 && !hasObjectParam) {
       // Single parameter - pass the value directly
       return await func(Object.values(inputs)[0]);
+    } else if (hasObjectParam) {
+      // Function expects single object parameter - pass inputs as object
+      return await func(inputs);
     } else {
-      // Multiple parameters - try both approaches
-      // First, try passing as single object (most common for workflow functions)
-      try {
-        return await func(inputs);
-      } catch (firstError) {
-        // If that fails, try passing values in order (for functions like addDays(date, days))
-        const values = Object.values(inputs);
-        try {
-          return await func(...values);
-        } catch {
-          // Throw the first error as it's more likely to be relevant
-          throw firstError;
-        }
+      // Multiple separate parameters - need to map input keys to parameter order
+      // Parse parameter names from function signature
+      const paramNames = params
+        .split(',')
+        .map((p: string) => {
+          // Extract parameter name, removing type annotations and default values
+          // Examples: "url: string" -> "url", "limit: number = 10" -> "limit"
+          return p.split(':')[0].split('=')[0].trim().replace(/[{}]/g, '');
+        })
+        .filter(Boolean);
+
+      logger.debug({
+        functionParams: paramNames,
+        inputKeys: Object.keys(inputs),
+        msg: 'Parameter mapping analysis'
+      });
+
+      // Try to map inputs to parameter order
+      // Check if all param names have corresponding inputs
+      const hasAllParams = paramNames.every((name: string) => name in inputs);
+
+      if (hasAllParams) {
+        // Perfect match - map inputs to parameter order
+        const orderedValues = paramNames.map((name: string) => inputs[name]);
+        logger.debug({
+          msg: 'Mapped parameters to function signature order',
+          mapping: paramNames.map((name: string, i: number) => `${name}=${JSON.stringify(orderedValues[i])}`)
+        });
+        return await func(...orderedValues);
+      } else {
+        // Parameter names don't match input keys - this is an error
+        // DO NOT fall back to Object.values as that uses insertion order, not parameter order
+        const errorMsg = `Parameter mismatch for ${modulePath}: Function expects [${paramNames.join(', ')}] but workflow provided [${Object.keys(inputs).join(', ')}]`;
+        logger.error({
+          modulePath,
+          expectedParams: paramNames,
+          providedInputs: Object.keys(inputs),
+          msg: errorMsg
+        });
+        throw new Error(errorMsg);
       }
     }
   } catch (error) {
-    logger.error({ error, modulePath }, 'Module function execution failed');
+    logger.error({
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        cause: error.cause
+      } : error,
+      modulePath,
+      inputs,
+      msg: 'Module function execution failed'
+    });
     throw new Error(
-      `Failed to execute ${modulePath}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      `Failed to execute ${modulePath}: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 }
