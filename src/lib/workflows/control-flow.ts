@@ -176,20 +176,34 @@ export async function executeStep(
 ): Promise<unknown> {
   const normalizedStep = normalizeStep(step);
 
-  if (normalizedStep.type === 'condition') {
-    return executeConditionStep(normalizedStep, context, executeModuleFn, resolveVariablesFn);
-  }
+  try {
+    if (normalizedStep.type === 'condition') {
+      return await executeConditionStep(normalizedStep, context, executeModuleFn, resolveVariablesFn);
+    }
 
-  if (normalizedStep.type === 'forEach') {
-    return executeForEachStep(normalizedStep, context, executeModuleFn, resolveVariablesFn);
-  }
+    if (normalizedStep.type === 'forEach') {
+      return await executeForEachStep(normalizedStep, context, executeModuleFn, resolveVariablesFn);
+    }
 
-  if (normalizedStep.type === 'while') {
-    return executeWhileStep(normalizedStep, context, executeModuleFn, resolveVariablesFn);
-  }
+    if (normalizedStep.type === 'while') {
+      return await executeWhileStep(normalizedStep, context, executeModuleFn, resolveVariablesFn);
+    }
 
-  // Action step
-  return executeActionStep(normalizedStep, context, executeModuleFn, resolveVariablesFn);
+    // Action step
+    return await executeActionStep(normalizedStep, context, executeModuleFn, resolveVariablesFn);
+  } catch (error) {
+    // Add step context to error message
+    const stepInfo = `Step "${step.id}"${normalizedStep.type === 'action' && 'module' in normalizedStep ? ` (${normalizedStep.module})` : ''}`;
+    const errorMsg = error instanceof Error ? error.message : String(error);
+
+    logger.error({
+      stepId: step.id,
+      stepType: normalizedStep.type,
+      error: errorMsg,
+    }, `Error in ${stepInfo}`);
+
+    throw new Error(`${stepInfo}: ${errorMsg}`);
+  }
 }
 
 /**

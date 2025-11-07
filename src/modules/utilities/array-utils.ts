@@ -281,6 +281,40 @@ export function zip<T>(...arrays: T[][]): T[][] {
 }
 
 /**
+ * Zip multiple arrays into array of objects
+ * @param fieldArrays - Object mapping field names to arrays of values
+ * @returns Array of objects with fields populated from corresponding array values
+ * @example
+ * zipToObjects({
+ *   id: [1, 2, 3],
+ *   name: ['Alice', 'Bob', 'Carol'],
+ *   age: [25, 30, 35]
+ * })
+ * // Returns: [
+ * //   { id: 1, name: 'Alice', age: 25 },
+ * //   { id: 2, name: 'Bob', age: 30 },
+ * //   { id: 3, name: 'Carol', age: 35 }
+ * // ]
+ */
+export function zipToObjects(fieldArrays: Record<string, unknown[]>): Record<string, unknown>[] {
+  const fields = Object.keys(fieldArrays);
+  if (fields.length === 0) return [];
+
+  const maxLength = Math.max(...fields.map((field) => fieldArrays[field].length));
+  const result: Record<string, unknown>[] = [];
+
+  for (let i = 0; i < maxLength; i++) {
+    const obj: Record<string, unknown> = {};
+    for (const field of fields) {
+      obj[field] = fieldArrays[field][i];
+    }
+    result.push(obj);
+  }
+
+  return result;
+}
+
+/**
  * Partition array into two based on predicate
  */
 export function partition<T>(

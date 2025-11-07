@@ -1,0 +1,49 @@
+{
+  "version": "1.0",
+  "name": "Telegram AI Bot",
+  "description": "Telegram bot that receives messages, processes them with AI, and sends intelligent responses back",
+  "trigger": {
+    "type": "manual",
+    "config": {}
+  },
+  "config": {
+    "steps": [
+      {
+        "id": "process-with-ai",
+        "inputs": {
+          "model": "gpt-4o-mini",
+          "apiKey": "{{user.openai}}",
+          "prompt": "{{trigger.message.text}}",
+          "provider": "openai",
+          "maxTokens": 500,
+          "temperature": 0.7,
+          "systemPrompt": "You are a helpful AI assistant integrated into a Telegram bot. Provide clear, concise, and friendly responses. Keep your answers brief and conversational."
+        },
+        "module": "ai.ai-sdk.generateText",
+        "outputAs": "aiResponse"
+      },
+      {
+        "id": "send-response",
+        "inputs": {
+          "text": "{{aiResponse.text}}",
+          "chatId": "{{trigger.message.chat.id}}"
+        },
+        "module": "communication.telegram.sendText"
+      }
+    ],
+    "trigger": {
+      "type": "telegram",
+      "config": {
+        "botToken": "{{user.telegram_bot_token}}"
+      }
+    }
+  },
+  "metadata": {
+    "author": "Exported from b0t",
+    "tags": [],
+    "category": "utilities",
+    "requiresCredentials": [],
+    "exportedAt": "2025-11-07T17:53:13.855Z",
+    "originalId": "02b76618-905b-4bff-bf46-274ec46dc54e"
+  }
+}

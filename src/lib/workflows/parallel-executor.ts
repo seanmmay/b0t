@@ -67,6 +67,15 @@ export function buildDependencyGraph(
   // Built-in variables that don't represent step outputs
   const builtInVars = new Set(['user', 'trigger', ...Object.keys(context.variables)]);
 
+  // Build mapping from outputAs variable names to step IDs
+  // This allows us to track dependencies when steps use outputAs
+  const outputVarToStepId = new Map<string, string>();
+  for (const step of steps) {
+    if (step.type === 'action' && 'outputAs' in step && step.outputAs) {
+      outputVarToStepId.set(step.outputAs, step.id);
+    }
+  }
+
   for (const step of steps) {
     const variableRefs = new Set<string>();
 
@@ -81,11 +90,17 @@ export function buildDependencyGraph(
       extractVariableReferences(step.condition, variableRefs);
     }
 
-    // Filter out built-in variables and keep only step output references
+    // Filter out built-in variables and resolve step dependencies
     const stepDependencies = new Set<string>();
     for (const varRef of variableRefs) {
-      // Check if this variable references another step's output
-      if (stepIds.has(varRef) && !builtInVars.has(varRef)) {
+      if (builtInVars.has(varRef)) continue;
+
+      // Check if this variable references another step's output via outputAs
+      const dependsOnStepId = outputVarToStepId.get(varRef);
+      if (dependsOnStepId && dependsOnStepId !== step.id) {
+        stepDependencies.add(dependsOnStepId);
+      } else if (stepIds.has(varRef) && varRef !== step.id) {
+        // Also support direct step ID references (for backward compatibility)
         stepDependencies.add(varRef);
       }
     }

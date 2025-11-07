@@ -407,8 +407,10 @@ async function executeModuleFunction(
     const params = paramMatch?.[1]?.trim() || '';
 
     // If function has a single parameter with object destructuring, pass as object
-    // Examples: "({ subreddit, limit })" or "options: RedditSubmitOptions"
-    const hasObjectParam = params.startsWith('{') || (params.includes(':') && !params.includes(','));
+    // Examples: "({ subreddit, limit })" or "options: RedditSubmitOptions" or "fieldArrays: Record<string, unknown[]>"
+    // Need to ignore commas inside angle brackets (generics) when counting parameters
+    const paramsWithoutGenerics = params.replace(/<[^>]+>/g, '');
+    const hasObjectParam = params.startsWith('{') || (params.includes(':') && !paramsWithoutGenerics.includes(','));
 
     const inputKeys = Object.keys(inputs);
 

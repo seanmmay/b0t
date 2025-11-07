@@ -1272,6 +1272,24 @@ export function getModuleRegistry(): ModuleCategory[] {
               signature: 'countBy(array)',
               example: 'countBy([1,1,2,2,2,3]) → {1:2, 2:3, 3:1}',
             },
+            {
+              name: 'zipToObjects',
+              description: 'Zip multiple arrays into array of objects - combines arrays with field names to create structured data',
+              signature: 'zipToObjects(fieldArrays)',
+              example: 'zipToObjects({id: [1,2,3], name: ["Alice", "Bob", "Carol"], age: [25,30,35]}) → [{id:1,name:"Alice",age:25},{id:2,name:"Bob",age:30},{id:3,name:"Carol",age:35}]',
+            },
+            {
+              name: 'fill',
+              description: 'Create array filled with repeated value',
+              signature: 'fill(length, value)',
+              example: 'fill(5, "hello") → ["hello","hello","hello","hello","hello"]',
+            },
+            {
+              name: 'range',
+              description: 'Create array of numbers from start to end',
+              signature: 'range(start, end, step?)',
+              example: 'range(1, 5, 1) → [1,2,3,4]',
+            },
           ],
         },
         {

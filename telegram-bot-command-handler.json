@@ -1,0 +1,52 @@
+{
+  "version": "1.0",
+  "name": "Telegram Bot Command Handler",
+  "description": "Responds to Telegram bot commands with useful information. Configure bot token in Settings dialog.",
+  "trigger": {
+    "type": "telegram",
+    "config": {
+      "command": "/info",
+      "botToken": ""
+    }
+  },
+  "config": {
+    "steps": [
+      {
+        "id": "get-current-time",
+        "inputs": {},
+        "module": "utilities.datetime.now",
+        "outputAs": "currentTime"
+      },
+      {
+        "id": "format-time",
+        "inputs": {
+          "date": "{{currentTime}}"
+        },
+        "module": "utilities.datetime.toISO",
+        "outputAs": "formattedTime"
+      },
+      {
+        "id": "generate-random-fact",
+        "inputs": {
+          "arr": [
+            "Did you know? Honey never spoils!",
+            "Fun fact: Octopuses have three hearts.",
+            "Interesting: Bananas are berries, but strawberries aren't!",
+            "Amazing: A day on Venus is longer than its year.",
+            "Cool fact: The shortest war lasted 38 minutes."
+          ]
+        },
+        "module": "utilities.array-utils.random",
+        "outputAs": "randomFact"
+      }
+    ]
+  },
+  "metadata": {
+    "author": "Exported from b0t",
+    "tags": [],
+    "category": "utilities",
+    "requiresCredentials": [],
+    "exportedAt": "2025-11-07T15:40:35.408Z",
+    "originalId": "e213daf1-4473-455d-8652-cf5690934c65"
+  }
+}

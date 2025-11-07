@@ -1,0 +1,61 @@
+{
+  "version": "1.0",
+  "name": "Daily Report Generator (Manual)",
+  "description": "Generate a daily summary report with current date, time, and random stats. Triggered manually via dashboard.",
+  "trigger": {
+    "type": "manual",
+    "config": {}
+  },
+  "config": {
+    "steps": [
+      {
+        "id": "get-current-date",
+        "inputs": {},
+        "module": "utilities.datetime.now",
+        "outputAs": "currentDate"
+      },
+      {
+        "id": "format-date",
+        "inputs": {
+          "date": "{{currentDate}}"
+        },
+        "module": "utilities.datetime.toISO",
+        "outputAs": "formattedDate"
+      },
+      {
+        "id": "generate-uuid",
+        "inputs": {},
+        "module": "utilities.encryption.generateUUID",
+        "outputAs": "reportId"
+      },
+      {
+        "id": "create-stats",
+        "inputs": {
+          "array": [
+            1000,
+            2000,
+            3000,
+            4000,
+            5000,
+            6000,
+            7000,
+            8000,
+            9000,
+            10000
+          ],
+          "count": 3
+        },
+        "module": "utilities.array-utils.sample",
+        "outputAs": "stats"
+      }
+    ]
+  },
+  "metadata": {
+    "author": "Exported from b0t",
+    "tags": [],
+    "category": "utilities",
+    "requiresCredentials": [],
+    "exportedAt": "2025-11-07T15:38:41.942Z",
+    "originalId": "247f9e6d-76d8-43e2-88e4-3d947dc67f6d"
+  }
+}
