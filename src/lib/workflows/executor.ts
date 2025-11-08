@@ -383,20 +383,57 @@ async function executeModuleFunction(
     // Dynamic import of module
     const moduleFile = await import(`@/modules/${categoryName}/${moduleName}`);
 
-    if (!moduleFile[functionName]) {
-      throw new Error(`Function ${functionName} not found in module ${categoryName}/${moduleName}`);
+    // Auto-detect and prefer API key version for read-only operations
+    // Read-only operations: search, get, fetch, list, view, read, find, retrieve, download, load
+    const readOnlyPrefixes = ['search', 'get', 'fetch', 'list', 'view', 'read', 'find', 'retrieve', 'download', 'load'];
+    const isReadOnly = readOnlyPrefixes.some(prefix =>
+      functionName.toLowerCase().startsWith(prefix)
+    );
+
+    let actualFunctionName = functionName;
+    const actualInputs = { ...inputs };
+
+    // If it's a read-only operation, try to use the API key version
+    if (isReadOnly) {
+      const apiKeyVersion = `${functionName}WithApiKey`;
+
+      if (moduleFile[apiKeyVersion]) {
+        logger.info({
+          originalFunction: functionName,
+          apiKeyVersion,
+          modulePath
+        }, 'Auto-selecting API key version for read-only operation');
+
+        actualFunctionName = apiKeyVersion;
+
+        // Auto-inject API key if not already provided
+        if (!actualInputs.apiKey) {
+          // Extract service name from module (e.g., "youtube" from "youtube")
+          const apiKeyCredential = `${moduleName}_api_key`;
+          actualInputs.apiKey = `{{credential.${apiKeyCredential}}}`;
+
+          logger.info({
+            apiKeyCredential,
+            moduleName
+          }, 'Auto-injecting API key credential reference');
+        }
+      }
     }
 
-    const func = moduleFile[functionName];
+    if (!moduleFile[actualFunctionName]) {
+      throw new Error(`Function ${actualFunctionName} not found in module ${categoryName}/${moduleName}`);
+    }
+
+    const func = moduleFile[actualFunctionName];
 
     // Debug logging for credential-related functions
     if (modulePath.includes('youtube') || modulePath.includes('searchVideos')) {
       logger.info({
         modulePath,
-        functionName,
-        inputKeys: Object.keys(inputs),
-        hasApiKey: 'apiKey' in inputs,
-        apiKeyValue: inputs.apiKey ? `${String(inputs.apiKey).substring(0, 10)}...` : 'MISSING'
+        functionName: actualFunctionName,
+        inputKeys: Object.keys(actualInputs),
+        hasApiKey: 'apiKey' in actualInputs,
+        apiKeyValue: actualInputs.apiKey ? `${String(actualInputs.apiKey).substring(0, 10)}...` : 'MISSING'
       }, 'Executing YouTube function with inputs');
     }
 
@@ -412,17 +449,17 @@ async function executeModuleFunction(
     const paramsWithoutGenerics = params.replace(/<[^>]+>/g, '');
     const hasObjectParam = params.startsWith('{') || (params.includes(':') && !paramsWithoutGenerics.includes(','));
 
-    const inputKeys = Object.keys(inputs);
+    const inputKeys = Object.keys(actualInputs);
 
     if (inputKeys.length === 0) {
       // No parameters
       return await func();
     } else if (inputKeys.length === 1 && !hasObjectParam) {
       // Single parameter - pass the value directly
-      return await func(Object.values(inputs)[0]);
+      return await func(Object.values(actualInputs)[0]);
     } else if (hasObjectParam) {
       // Function expects single object parameter - pass inputs as object
-      return await func(inputs);
+      return await func(actualInputs);
     } else {
       // Multiple separate parameters - need to map input keys to parameter order
       // Parse parameter names from function signature
@@ -437,7 +474,7 @@ async function executeModuleFunction(
 
       logger.debug({
         functionParams: paramNames,
-        inputKeys: Object.keys(inputs),
+        inputKeys: Object.keys(actualInputs),
         msg: 'Parameter mapping analysis'
       });
 
@@ -461,15 +498,15 @@ async function executeModuleFunction(
         let matchedKey: string | undefined;
 
         // Try exact match first
-        if (paramName in inputs) {
-          value = inputs[paramName];
+        if (paramName in actualInputs) {
+          value = actualInputs[paramName];
           matchedKey = paramName;
         } else {
           // Try aliases
           const aliases = paramAliases[paramName] || [];
           for (const alias of aliases) {
-            if (alias in inputs) {
-              value = inputs[alias];
+            if (alias in actualInputs) {
+              value = actualInputs[alias];
               matchedKey = alias;
               break;
             }

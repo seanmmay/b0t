@@ -79,23 +79,23 @@ const PLATFORM_CAPABILITIES: Record<string, PlatformCapability> = {
     category: 'both',
     preferredMethod: 'api_key', // API key is simpler for read-only operations
     functionRequirements: {
-      // Works with API key (read-only)
+      // Works with API key (read-only) - auto-detection will use these
       'searchVideosWithApiKey': 'api_key',
       'getVideoDetailsWithApiKey': 'api_key',
       'getChannelDetailsWithApiKey': 'api_key',
-      // OAuth versions (for backwards compatibility or when using OAuth)
-      'searchVideos': 'oauth',
-      'getVideoDetails': 'oauth',
-      'getChannelDetails': 'oauth',
+      // Read-only operations (auto-detected, will use API key if available)
+      'searchVideos': 'api_key', // Auto-switches to searchVideosWithApiKey
+      'getVideoDetails': 'api_key', // Auto-switches to getVideoDetailsWithApiKey
+      'getChannelDetails': 'api_key', // Auto-switches to getChannelDetailsWithApiKey
+      'getVideoComments': 'api_key', // Read-only
+      'getRecentVideos': 'api_key', // Read-only
+      'getComment': 'api_key', // Read-only
       // Require OAuth (write operations)
       'postComment': 'oauth',
       'replyToComment': 'oauth',
       'deleteComment': 'oauth',
-      'getVideoComments': 'oauth',
-      'getRecentVideos': 'oauth',
       'markCommentAsSpam': 'oauth',
       'setCommentModerationStatus': 'oauth',
-      'getComment': 'oauth',
     },
   },
 
