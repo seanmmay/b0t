@@ -550,49 +550,53 @@ function getConfigurableFields(
 
   // AI modules (ai.ai-sdk, ai.openai, ai.anthropic, ai.openai-workflow)
   if (modulePath.startsWith('ai.') || modulePath.toLowerCase().includes('openai') || modulePath.toLowerCase().includes('anthropic')) {
+    // Check if inputs are nested under 'options' (common pattern for AI modules)
+    const options = inputs.options as Record<string, unknown> | undefined;
+    const aiInputs = options || inputs;
+
     // Provider selection (for ai-sdk module only, not legacy modules)
     if (modulePath.includes('ai-sdk')) {
       fields.push({
         key: 'provider',
         label: 'AI Provider',
         type: 'select',
-        value: inputs.provider || 'openai',
+        value: aiInputs.provider || 'openai',
         options: ['openai', 'anthropic'],
         description: 'Choose between OpenAI (GPT) or Anthropic (Claude)',
       });
     }
 
     // System prompt (if present in inputs or always show for AI modules)
-    if (inputs.systemPrompt !== undefined || modulePath.startsWith('ai.')) {
+    if (aiInputs.systemPrompt !== undefined || modulePath.startsWith('ai.')) {
       fields.push({
         key: 'systemPrompt',
         label: 'System Prompt',
         type: 'textarea',
-        value: inputs.systemPrompt || '',
+        value: aiInputs.systemPrompt || '',
         placeholder: 'You are a helpful AI assistant...',
         description: 'Instructions that guide the AI behavior and responses',
       });
     }
 
     // Model selection (if present in inputs or always show for AI modules)
-    if (inputs.model !== undefined || modulePath.startsWith('ai.')) {
+    if (aiInputs.model !== undefined || modulePath.startsWith('ai.')) {
       fields.push({
         key: 'model',
         label: 'Model',
         type: 'text',
-        value: inputs.model || 'gpt-4o-mini',
+        value: aiInputs.model || 'gpt-4o-mini',
         placeholder: 'gpt-4o, gpt-4o-mini, claude-3-5-sonnet-20241022, etc.',
         description: 'AI model to use',
       });
     }
 
     // Temperature (if present in inputs)
-    if (inputs.temperature !== undefined) {
+    if (aiInputs.temperature !== undefined) {
       fields.push({
         key: 'temperature',
         label: 'Temperature',
         type: 'number',
-        value: inputs.temperature ?? 0.7,
+        value: aiInputs.temperature ?? 0.7,
         min: 0,
         max: 2,
         step: 0.1,
@@ -706,10 +710,22 @@ function applyStepSettings(
     if (settings) {
       if (!step.inputs) step.inputs = {};
 
+      // For AI modules, check if inputs are nested under 'options'
+      const isAIModule = step.module.startsWith('ai.') ||
+                         step.module.toLowerCase().includes('openai') ||
+                         step.module.toLowerCase().includes('anthropic');
+      const hasOptionsNesting = isAIModule && step.inputs.options && typeof step.inputs.options === 'object';
+
       // Apply all settings for this step
       Object.entries(settings).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
-          step.inputs[key] = value;
+          if (hasOptionsNesting) {
+            // Set nested in options for AI modules with that structure
+            (step.inputs.options as Record<string, unknown>)[key] = value;
+          } else {
+            // Set at top level for other modules
+            step.inputs[key] = value;
+          }
         }
       });
     }

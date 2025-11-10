@@ -120,6 +120,7 @@ export async function executeWorkflowWithProgress(
       workflowId,
       runId,
       userId,
+      config, // Include config for UI-set overrides (system prompts, etc.)
     };
 
     let lastOutput: unknown = null;
@@ -586,6 +587,9 @@ async function loadUserCredentials(userId: string): Promise<Record<string, strin
   try {
     const credentialMap: Record<string, string> = {};
 
+    // Load OAuth tokens with automatic token refresh for expired tokens
+    const { getValidOAuthToken, supportsTokenRefresh } = await import('@/lib/oauth-token-manager');
+
     const accounts = await db
       .select()
       .from(accountsTable)
@@ -593,9 +597,28 @@ async function loadUserCredentials(userId: string): Promise<Record<string, strin
 
     for (const account of accounts) {
       if (account.access_token) {
-        const { decrypt } = await import('@/lib/encryption');
-        const decryptedToken = await decrypt(account.access_token);
-        credentialMap[account.provider] = decryptedToken;
+        try {
+          // Check if this provider supports automatic token refresh
+          if (supportsTokenRefresh(account.provider)) {
+            // Get valid token (auto-refreshes if expired)
+            const validToken = await getValidOAuthToken(userId, account.provider);
+            credentialMap[account.provider] = validToken;
+            logger.info({ provider: account.provider }, 'Loaded OAuth token with auto-refresh support');
+          } else {
+            // Fallback to direct decryption for unsupported providers
+            const { decrypt } = await import('@/lib/encryption');
+            const decryptedToken = await decrypt(account.access_token);
+            credentialMap[account.provider] = decryptedToken;
+            logger.debug({ provider: account.provider }, 'Loaded OAuth token (no auto-refresh support)');
+          }
+        } catch (error) {
+          logger.error({
+            error,
+            provider: account.provider,
+            userId
+          }, 'Failed to load OAuth token');
+          // Don't throw - allow workflow to continue with other credentials
+        }
       }
     }
 

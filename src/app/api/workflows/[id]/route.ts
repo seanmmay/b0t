@@ -97,21 +97,41 @@ export async function PATCH(
       return NextResponse.json({ success: true, status: body.status });
     }
 
-    // Update trigger config
-    if (body.trigger) {
-      const updatedTrigger = {
-        ...workflow.trigger,
-        config: {
-          ...(workflow.trigger as { type: string; config: Record<string, unknown> }).config,
-          ...body.trigger.config,
-        },
-      };
+    // Update workflow config and/or trigger
+    if (body.config !== undefined || body.trigger !== undefined) {
+      const updates: Record<string, unknown> = {};
+
+      // Update workflow config (step settings like system prompts)
+      if (body.config !== undefined) {
+        updates.config = body.config as {
+          steps: Array<{
+            id: string;
+            module: string;
+            inputs: Record<string, unknown>;
+            outputAs?: string;
+          }>;
+          returnValue?: string;
+          outputDisplay?: {
+            type: string;
+            columns?: Array<{ key: string; label: string; type?: string }>;
+          };
+        };
+      }
+
+      // Update trigger config
+      if (body.trigger !== undefined) {
+        updates.trigger = {
+          ...workflow.trigger,
+          config: {
+            ...(workflow.trigger as { type: string; config: Record<string, unknown> }).config,
+            ...body.trigger.config,
+          },
+        };
+      }
 
       await db
         .update(workflowsTable)
-        .set({
-          trigger: updatedTrigger,
-        })
+        .set(updates)
         .where(
           and(
             eq(workflowsTable.id, id),
@@ -123,12 +143,13 @@ export async function PATCH(
         {
           userId: session.user.id,
           workflowId: id,
-          triggerType: updatedTrigger.type,
+          hasConfigUpdate: body.config !== undefined,
+          hasTriggerUpdate: body.trigger !== undefined,
         },
-        'Workflow trigger config updated'
+        'Workflow config/trigger updated'
       );
 
-      return NextResponse.json({ success: true, trigger: updatedTrigger });
+      return NextResponse.json({ success: true, ...updates });
     }
 
     return NextResponse.json({ error: 'No updates provided' }, { status: 400 });

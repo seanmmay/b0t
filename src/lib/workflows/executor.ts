@@ -25,6 +25,15 @@ export interface ExecutionContext {
   workflowId: string;
   runId: string;
   userId: string;
+  config?: {
+    steps: Array<{
+      id: string;
+      module: string;
+      inputs: Record<string, unknown>;
+      outputAs?: string;
+    }>;
+    returnValue?: string;
+  };
 }
 
 /**
@@ -114,6 +123,7 @@ export async function executeWorkflow(
       workflowId,
       runId,
       userId,
+      config, // Include config for UI-set overrides (system prompts, etc.)
     };
 
     // Normalize all steps first
@@ -653,7 +663,10 @@ async function loadUserCredentials(userId: string): Promise<Record<string, strin
     const credentialMap: Record<string, string> = {};
 
     // 1. Load OAuth tokens from accounts table (Twitter, YouTube, etc.)
+    // Uses automatic token refresh for expired tokens
     const { accountsTable, userCredentialsTable } = await import('@/lib/schema');
+    const { getValidOAuthToken, supportsTokenRefresh } = await import('@/lib/oauth-token-manager');
+
     const accounts = await db
       .select()
       .from(accountsTable)
@@ -661,9 +674,28 @@ async function loadUserCredentials(userId: string): Promise<Record<string, strin
 
     for (const account of accounts) {
       if (account.access_token) {
-        const { decrypt } = await import('@/lib/encryption');
-        const decryptedToken = await decrypt(account.access_token);
-        credentialMap[account.provider] = decryptedToken;
+        try {
+          // Check if this provider supports automatic token refresh
+          if (supportsTokenRefresh(account.provider)) {
+            // Get valid token (auto-refreshes if expired)
+            const validToken = await getValidOAuthToken(userId, account.provider);
+            credentialMap[account.provider] = validToken;
+            logger.info({ provider: account.provider }, 'Loaded OAuth token with auto-refresh support');
+          } else {
+            // Fallback to direct decryption for unsupported providers
+            const { decrypt } = await import('@/lib/encryption');
+            const decryptedToken = await decrypt(account.access_token);
+            credentialMap[account.provider] = decryptedToken;
+            logger.debug({ provider: account.provider }, 'Loaded OAuth token (no auto-refresh support)');
+          }
+        } catch (error) {
+          logger.error({
+            error,
+            provider: account.provider,
+            userId
+          }, 'Failed to load OAuth token');
+          // Don't throw - allow workflow to continue with other credentials
+        }
       }
     }
 
