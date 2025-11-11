@@ -129,10 +129,13 @@ export async function initializeScheduler() {
     return dbSettings.enabled !== undefined ? dbSettings.enabled : job.enabled;
   });
 
-  logger.info(
-    { totalJobs: scheduler.getJobs().length, enabledCount: enabledJobs.length },
-    'Node-cron scheduler started'
-  );
+  // Only log in production or if explicitly requested
+  if (process.env.NODE_ENV !== 'development' || process.env.LOG_SCHEDULER === 'true') {
+    logger.info(
+      { totalJobs: scheduler.getJobs().length, enabledCount: enabledJobs.length },
+      'Node-cron scheduler started'
+    );
+  }
 }
 
 /**

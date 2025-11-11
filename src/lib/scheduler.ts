@@ -41,7 +41,10 @@ class Scheduler {
     }
 
     if (job.enabled === false) {
-      logger.info({ jobName: job.name, action: 'job_disabled' }, `Job "${job.name}" is disabled. Skipping registration.`);
+      // Only log in production or if explicitly requested
+      if (process.env.NODE_ENV !== 'development' || process.env.LOG_SCHEDULER === 'true') {
+        logger.info({ jobName: job.name, action: 'job_disabled' }, `Job "${job.name}" is disabled. Skipping registration.`);
+      }
       return;
     }
 
@@ -101,7 +104,11 @@ class Scheduler {
     scheduledTask.stop();
 
     this.jobs.set(job.name, scheduledTask);
-    logger.info({ jobName: job.name, schedule: job.schedule, action: 'job_registered' }, `Registered job: ${job.name} (${job.schedule})`);
+
+    // Only log in production or if explicitly requested
+    if (process.env.NODE_ENV !== 'development' || process.env.LOG_SCHEDULER === 'true') {
+      logger.info({ jobName: job.name, schedule: job.schedule, action: 'job_registered' }, `Registered job: ${job.name} (${job.schedule})`);
+    }
   }
 
   /**
@@ -113,15 +120,24 @@ class Scheduler {
       return;
     }
 
-    logger.info({ jobCount: this.jobs.size, action: 'scheduler_starting' }, `Starting scheduler with ${this.jobs.size} job(s)...`);
+    // Simple console log for dev, structured log for production
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`⏰ Scheduler started (${this.jobs.size} jobs)`);
+    } else {
+      logger.info({ jobCount: this.jobs.size, action: 'scheduler_starting' }, `Starting scheduler with ${this.jobs.size} job(s)...`);
+    }
 
     this.jobs.forEach((task, name) => {
       task.start();
-      logger.info({ jobName: name, action: 'job_started' }, `Started job: ${name}`);
+      if (process.env.NODE_ENV !== 'development' || process.env.LOG_SCHEDULER === 'true') {
+        logger.info({ jobName: name, action: 'job_started' }, `Started job: ${name}`);
+      }
     });
 
     this.isInitialized = true;
-    logger.info({ action: 'scheduler_started' }, 'Scheduler started successfully');
+    if (process.env.NODE_ENV !== 'development' || process.env.LOG_SCHEDULER === 'true') {
+      logger.info({ action: 'scheduler_started' }, 'Scheduler started successfully');
+    }
   }
 
   /**

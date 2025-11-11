@@ -65,9 +65,11 @@ export const createNodeLogger = () => {
           // Format message
           let output = prefix ? `${prefix} ${msg}` : msg;
 
-          // Add metadata if present
-          if (Object.keys(metadata).length > 0) {
-            output += ' ' + JSON.stringify(metadata);
+          // Only show metadata if LOG_VERBOSE=true or for errors
+          if (process.env.LOG_VERBOSE === 'true' || level >= 50) {
+            if (Object.keys(metadata).length > 0) {
+              output += ' ' + JSON.stringify(metadata);
+            }
           }
 
           // Write to stdout (Next.js will capture this)

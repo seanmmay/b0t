@@ -52,14 +52,19 @@ export async function preloadCredentialCache(maxUsers: number = 100): Promise<Ca
   const startTime = Date.now();
   let errors = 0;
 
-  logger.info('Starting credential cache pre-loading...');
+  // Only log in production or if explicitly requested
+  if (process.env.NODE_ENV !== 'development' || process.env.LOG_CACHE === 'true') {
+    logger.info('Starting credential cache pre-loading...');
+  }
 
   try {
     // Get users with active workflows
     const activeUsers = await getActiveUsers(maxUsers);
 
     if (activeUsers.length === 0) {
-      logger.info('No users with workflows found - skipping credential pre-load');
+      if (process.env.NODE_ENV !== 'development' || process.env.LOG_CACHE === 'true') {
+        logger.info('No users with workflows found - skipping credential pre-load');
+      }
       return {
         usersPreloaded: 0,
         duration: Date.now() - startTime,
@@ -67,10 +72,12 @@ export async function preloadCredentialCache(maxUsers: number = 100): Promise<Ca
       };
     }
 
-    logger.info(
-      { userCount: activeUsers.length },
-      `Pre-loading credentials for ${activeUsers.length} users...`
-    );
+    if (process.env.NODE_ENV !== 'development' || process.env.LOG_CACHE === 'true') {
+      logger.info(
+        { userCount: activeUsers.length },
+        `Pre-loading credentials for ${activeUsers.length} users...`
+      );
+    }
 
     // Lazy import to avoid circular dependencies
     const { loadUserCredentials } = await import('./executor');
@@ -105,14 +112,17 @@ export async function preloadCredentialCache(maxUsers: number = 100): Promise<Ca
 
     const duration = Date.now() - startTime;
 
-    logger.info(
-      {
-        usersPreloaded: activeUsers.length - errors,
-        errors,
-        duration,
-      },
-      `✅ Credential cache pre-loaded for ${activeUsers.length - errors} users in ${duration}ms`
-    );
+    // Only log in production or if explicitly requested
+    if (process.env.NODE_ENV !== 'development' || process.env.LOG_CACHE === 'true') {
+      logger.info(
+        {
+          usersPreloaded: activeUsers.length - errors,
+          errors,
+          duration,
+        },
+        `✅ Credential cache pre-loaded for ${activeUsers.length - errors} users in ${duration}ms`
+      );
+    }
 
     // Mark system as "hot" once credentials are cached
     updateSystemStatus({
