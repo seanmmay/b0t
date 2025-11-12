@@ -61,6 +61,7 @@ declare module '@auth/core/jwt' {
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   debug: false, // Disable debug warnings in development
+  trustHost: true, // Required for production deployments (Railway, Vercel, etc.)
   providers: [
     // Simple Email/Password Authentication
     // For single user app - credentials stored in environment variables

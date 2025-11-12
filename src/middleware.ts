@@ -10,7 +10,9 @@ import { NextResponse } from 'next/server';
 
 export default auth((req) => {
   const { pathname } = req.nextUrl;
-  const isAuthenticated = !!req.auth;
+  // NextAuth v5: req.auth contains the session when authenticated
+  // In production, this should be properly set by the auth() wrapper
+  const isAuthenticated = !!req.auth?.user;
 
   // Security headers for production
   const response = NextResponse.next();
