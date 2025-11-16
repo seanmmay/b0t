@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, ChevronDown } from 'lucide-react';
+import { Loader2, ChevronDown, ChevronsUpDown, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Collapsible,
@@ -21,6 +21,8 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import { CronTriggerConfig } from './trigger-configs/cron-trigger-config';
+import { Command, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface WorkflowSettingsDialogProps {
   workflowId: string;
@@ -71,6 +73,7 @@ export function WorkflowSettingsDialog({
   const [saving, setSaving] = useState(false);
   const [openSteps, setOpenSteps] = useState<Record<string, boolean>>({});
   const [initialized, setInitialized] = useState(false);
+  const [selectOpenStates, setSelectOpenStates] = useState<Record<string, boolean>>({});
 
   // Extract configurable steps from workflow config
   useEffect(() => {
@@ -307,23 +310,48 @@ export function WorkflowSettingsDialog({
         );
 
       case 'select':
+        const selectKey = `${stepKey}-${field.key}`;
+        const isSelectOpen = selectOpenStates[selectKey] || false;
         return (
           <div key={field.key} className="bg-muted/50 rounded-lg p-3 border border-border/50 space-y-2">
             <Label htmlFor={`${stepKey}-${field.key}`} className="text-sm font-medium">
               {field.label}
             </Label>
-            <select
-              id={`${stepKey}-${field.key}`}
-              value={(value as string) || ''}
-              onChange={(e) => updateStepSetting(stepKey, field.key, e.target.value)}
-              className="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
-              {field.options?.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
+            <Popover open={isSelectOpen} onOpenChange={(open) => setSelectOpenStates(prev => ({ ...prev, [selectKey]: open }))} modal={true}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={isSelectOpen}
+                  className="w-full justify-between font-normal h-9 text-sm"
+                >
+                  {(value as string) || field.options?.[0] || 'Select...'}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start" style={{ width: 'var(--radix-popover-trigger-width)' }}>
+                <Command>
+                  <CommandList className="max-h-[300px]">
+                    <CommandGroup>
+                      {field.options?.map((option) => (
+                        <CommandItem
+                          key={option}
+                          value={option}
+                          onSelect={() => {
+                            updateStepSetting(stepKey, field.key, option);
+                            setSelectOpenStates(prev => ({ ...prev, [selectKey]: false }));
+                          }}
+                          className="text-sm"
+                        >
+                          <Check className={`mr-2 h-4 w-4 ${value === option ? 'opacity-100' : 'opacity-0'}`} />
+                          {option}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {field.description && (
               <p className="text-xs text-muted-foreground">{field.description}</p>
             )}

@@ -3,10 +3,20 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Upload, Search, Workflow, CheckCircle2, XCircle } from 'lucide-react';
+import { Upload, Search, Workflow, CheckCircle2, XCircle, ChevronsUpDown, Check } from 'lucide-react';
 import { WorkflowsList } from '@/components/workflows/workflows-list';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Command,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -26,6 +36,8 @@ export default function WorkflowsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [triggerFilter, setTriggerFilter] = useState('all');
+  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
+  const [triggerFilterOpen, setTriggerFilterOpen] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
@@ -279,34 +291,181 @@ export default function WorkflowsPage() {
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="paused">Paused</SelectItem>
-              </SelectContent>
-            </Select>
+            <Popover open={statusFilterOpen} onOpenChange={setStatusFilterOpen} modal={true}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={statusFilterOpen}
+                  className="w-[140px] justify-between font-normal"
+                >
+                  {statusFilter === 'all' ? 'All statuses' : statusFilter === 'active' ? 'Active' : statusFilter === 'draft' ? 'Draft' : 'Paused'}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[140px] p-0" align="start">
+                <Command>
+                  <CommandList className="max-h-[300px]">
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setStatusFilter('all');
+                          setStatusFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${statusFilter === 'all' ? 'opacity-100' : 'opacity-0'}`} />
+                        All statuses
+                      </CommandItem>
+                      <CommandItem
+                        value="active"
+                        onSelect={() => {
+                          setStatusFilter('active');
+                          setStatusFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${statusFilter === 'active' ? 'opacity-100' : 'opacity-0'}`} />
+                        Active
+                      </CommandItem>
+                      <CommandItem
+                        value="draft"
+                        onSelect={() => {
+                          setStatusFilter('draft');
+                          setStatusFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${statusFilter === 'draft' ? 'opacity-100' : 'opacity-0'}`} />
+                        Draft
+                      </CommandItem>
+                      <CommandItem
+                        value="paused"
+                        onSelect={() => {
+                          setStatusFilter('paused');
+                          setStatusFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${statusFilter === 'paused' ? 'opacity-100' : 'opacity-0'}`} />
+                        Paused
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
 
-            <Select value={triggerFilter} onValueChange={setTriggerFilter}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="All triggers" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All triggers</SelectItem>
-                <SelectItem value="manual">Manual</SelectItem>
-                <SelectItem value="cron">Scheduled</SelectItem>
-                <SelectItem value="webhook">Webhook</SelectItem>
-                <SelectItem value="chat">Chat</SelectItem>
-                <SelectItem value="gmail">Gmail</SelectItem>
-                <SelectItem value="outlook">Outlook</SelectItem>
-                <SelectItem value="telegram">Telegram</SelectItem>
-                <SelectItem value="discord">Discord</SelectItem>
-              </SelectContent>
-            </Select>
+            <Popover open={triggerFilterOpen} onOpenChange={setTriggerFilterOpen} modal={true}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={triggerFilterOpen}
+                  className="w-[140px] justify-between font-normal"
+                >
+                  {triggerFilter === 'all' ? 'All triggers' :
+                   triggerFilter === 'cron' ? 'Scheduled' :
+                   triggerFilter.charAt(0).toUpperCase() + triggerFilter.slice(1)}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[140px] p-0" align="start">
+                <Command>
+                  <CommandList className="max-h-[300px]">
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setTriggerFilter('all');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'all' ? 'opacity-100' : 'opacity-0'}`} />
+                        All triggers
+                      </CommandItem>
+                      <CommandItem
+                        value="manual"
+                        onSelect={() => {
+                          setTriggerFilter('manual');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'manual' ? 'opacity-100' : 'opacity-0'}`} />
+                        Manual
+                      </CommandItem>
+                      <CommandItem
+                        value="cron"
+                        onSelect={() => {
+                          setTriggerFilter('cron');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'cron' ? 'opacity-100' : 'opacity-0'}`} />
+                        Scheduled
+                      </CommandItem>
+                      <CommandItem
+                        value="webhook"
+                        onSelect={() => {
+                          setTriggerFilter('webhook');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'webhook' ? 'opacity-100' : 'opacity-0'}`} />
+                        Webhook
+                      </CommandItem>
+                      <CommandItem
+                        value="chat"
+                        onSelect={() => {
+                          setTriggerFilter('chat');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'chat' ? 'opacity-100' : 'opacity-0'}`} />
+                        Chat
+                      </CommandItem>
+                      <CommandItem
+                        value="gmail"
+                        onSelect={() => {
+                          setTriggerFilter('gmail');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'gmail' ? 'opacity-100' : 'opacity-0'}`} />
+                        Gmail
+                      </CommandItem>
+                      <CommandItem
+                        value="outlook"
+                        onSelect={() => {
+                          setTriggerFilter('outlook');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'outlook' ? 'opacity-100' : 'opacity-0'}`} />
+                        Outlook
+                      </CommandItem>
+                      <CommandItem
+                        value="telegram"
+                        onSelect={() => {
+                          setTriggerFilter('telegram');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'telegram' ? 'opacity-100' : 'opacity-0'}`} />
+                        Telegram
+                      </CommandItem>
+                      <CommandItem
+                        value="discord"
+                        onSelect={() => {
+                          setTriggerFilter('discord');
+                          setTriggerFilterOpen(false);
+                        }}
+                      >
+                        <Check className={`mr-2 h-4 w-4 ${triggerFilter === 'discord' ? 'opacity-100' : 'opacity-0'}`} />
+                        Discord
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <Button
